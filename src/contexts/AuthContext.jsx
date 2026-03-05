@@ -17,7 +17,16 @@ export function AuthProvider({ children }) {
     if (!token) { setLoading(false); return }
     try {
       const { data } = await authAPI.getCurrentUser()
-      setUser(data)
+      // Map role from backend roles array or username fallback
+      const role = data.roles?.[0]?.name || data.roles?.[0] ||
+        (data.is_superuser ? 'admin' :
+         data.username === 'admin' ? 'admin' :
+         data.username === 'qa_manager' ? 'qa_manager' :
+         data.username === 'qa_engineer' ? 'qa_engineer' :
+         data.username === 'doc_controller' ? 'doc_controller' :
+         data.username === 'auditor' ? 'auditor' :
+         'qa_manager') // Default to qa_manager for full access
+      setUser({ ...data, role })
     } catch {
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
