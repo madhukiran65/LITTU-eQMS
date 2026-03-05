@@ -22,12 +22,12 @@ export const qualityTrend = [
 
 export const documents = [
   { id: 1, document_id: 'DOC-2026-0001', title: 'Quality Manual — IVD QMS Framework', type: 'SOP', status: 'effective', version: '3.2', department: 'Quality', author: 'Dr. Sarah Chen', updated: '2026-02-28', reviewDate: '2026-08-28' },
-  { id: 2, document_id: 'DOC-2026-0002', title: 'Design Control Procedure for IVD Devices', type: 'SOP', status: 'in_review', version: '2.1', department: 'R&D', author: 'James Miller', updated: '2026-03-01', reviewDate: '2026-09-01' },
+  { id: 2, document_id: 'DOC-2026-0002', title: 'Design Control Procedure for IVD Devices', type: 'SOP', status: 'in_review', version: '2.1', department: 'R&D', author: 'James Miller', updated: '2026-02-28', reviewDate: '2026-08-28' },
   { id: 3, document_id: 'DOC-2026-0003', title: 'CAPA Management Procedure', type: 'SOP', status: 'effective', version: '4.0', department: 'Quality', author: 'Dr. Sarah Chen', updated: '2026-02-15', reviewDate: '2026-08-15' },
-  { id: 4, document_id: 'DOC-2026-0004', title: 'Risk Management Plan — ISO 14971', type: 'Plan', status: 'draft', version: '1.0', department: 'R&D', author: 'Emily Rodriguez', updated: '2026-03-01', reviewDate: '2026-09-01' },
+  { id: 4, document_id: 'DOC-2026-0004', title: 'Risk Management Plan — ISO 14971', type: 'Plan', status: 'draft', version: '1.0', department: 'R&D', author: 'Emily Rodriguez', updated: '2026-02-28', reviewDate: '2026-08-28' },
   { id: 5, document_id: 'DOC-2026-0005', title: 'Supplier Qualification Protocol', type: 'Protocol', status: 'effective', version: '2.3', department: 'Supply Chain', author: 'Michael Park', updated: '2026-02-20', reviewDate: '2026-08-20' },
   { id: 6, document_id: 'DOC-2026-0006', title: 'Equipment Calibration SOP', type: 'SOP', status: 'approved', version: '1.5', department: 'Engineering', author: 'Lisa Wang', updated: '2026-02-25', reviewDate: '2026-08-25' },
-  { id: 7, document_id: 'DOC-2026-0007', title: 'Complaint Handling Procedure — FDA MDR', type: 'SOP', status: 'training_period', version: '3.1', department: 'Quality', author: 'Dr. Sarah Chen', updated: '2026-03-01', reviewDate: '2026-09-01' },
+  { id: 7, document_id: 'DOC-2026-0007', title: 'Complaint Handling Procedure — FDA MDR', type: 'SOP', status: 'training_period', version: '3.1', department: 'Quality', author: 'Dr. Sarah Chen', updated: '2026-02-28', reviewDate: '2026-08-28' },
   { id: 8, document_id: 'DOC-2026-0008', title: 'IQ/OQ/PQ Validation Protocol Template', type: 'Template', status: 'effective', version: '2.0', department: 'Validation', author: 'Robert Kim', updated: '2026-01-15', reviewDate: '2026-07-15' },
 ];
 
@@ -41,8 +41,8 @@ export const capas = [
 
 export const deviations = [
   { id: 1, deviation_id: 'DEV-2026-0001', title: 'pH out of range during buffer preparation', stage: 'investigation', severity: 'major', department: 'Production', assignee: 'Robert Kim', created: '2026-02-28', dueDate: '2026-03-14' },
-  { id: 2, deviation_id: 'DEV-2026-0002', title: 'Missing batch record signature for Lot 2026-B', stage: 'root_cause', severity: 'minor', department: 'Quality', assignee: 'Dr. Sarah Chen', created: '2026-03-01', dueDate: '2026-03-15' },
-  { id: 3, deviation_id: 'DEV-2026-0003', title: 'Particulate contamination detected in cleanroom', stage: 'containment', severity: 'critical', department: 'Engineering', assignee: 'Michael Park', created: '2026-03-01', dueDate: '2026-03-09' },
+  { id: 2, deviation_id: 'DEV-2026-0002', title: 'Missing batch record signature for Lot 2026-B', stage: 'root_cause', severity: 'minor', department: 'Quality', assignee: 'Dr. Sarah Chen', created: '2026-02-28', dueDate: '2026-03-15' },
+  { id: 3, deviation_id: 'DEV-2026-0003', title: 'Particulate contamination detected in cleanroom', stage: 'containment', severity: 'critical', department: 'Engineering', assignee: 'Michael Park', created: '2026-02-28', dueDate: '2026-03-09' },
   { id: 4, deviation_id: 'DEV-2026-0004', title: 'Supplier delivered wrong raw material grade', stage: 'closed', severity: 'major', department: 'Supply Chain', assignee: 'Lisa Wang', created: '2026-02-10', dueDate: '2026-02-24' },
 ];
 
@@ -53,9 +53,9 @@ export const changeControls = [
 ];
 
 export const complaints = [
-  { id: 1, complaint_id: 'CMP-2026-0001', title: 'False positive results reported by 3 clinical sites', status: 'investigation', severity: 'critical', source: 'Customer', isMDR: true, mdrDeadline: '2026-03-07', created: '2026-03-01' },
+  { id: 1, complaint_id: 'CMP-2026-0001', title: 'False positive results reported by 3 clinical sites', status: 'investigation', severity: 'critical', source: 'Customer', isMDR: true, mdrDeadline: '2026-03-07', created: '2026-02-28' },
   { id: 2, complaint_id: 'CMP-2026-0002', title: 'Reagent kit expired before stated date', status: 'resolution', severity: 'major', source: 'Distributor', isMDR: false, created: '2026-02-25' },
-  { id: 3, complaint_id: 'CMP-2026-0003', title: 'Instrument error code E-42 during sample processing', status: 'open', severity: 'minor', source: 'Customer', isMDR: false, created: '2026-03-01' },
+  { id: 3, complaint_id: 'CMP-2026-0003', title: 'Instrument error code E-42 during sample processing', status: 'open', severity: 'minor', source: 'Customer', isMDR: false, created: '2026-02-28' },
   { id: 4, complaint_id: 'CMP-2026-0004', title: 'Patient adverse event — allergic reaction to latex component', status: 'investigation', severity: 'critical', source: 'Hospital', isMDR: true, mdrDeadline: '2026-03-05', created: '2026-02-28' },
 ];
 
@@ -68,7 +68,7 @@ export const trainingCourses = [
 ];
 
 export const audits = [
-  { id: 1, audit_id: 'AUD-2026-001', title: 'Internal Audit — Document Control System', type: 'Internal', status: 'in_progress', lead: 'Dr. Sarah Chen', startDate: '2026-03-01', endDate: '2026-03-15', findings: 4, observations: 7 },
+  { id: 1, audit_id: 'AUD-2026-001', title: 'Internal Audit — Document Control System', type: 'Internal', status: 'in_progress', lead: 'Dr. Sarah Chen', startDate: '2026-02-28', endDate: '2026-03-15', findings: 4, observations: 7 },
   { id: 2, audit_id: 'AUD-2026-002', title: 'Supplier Audit — Reagent Manufacturer ABC', type: 'Supplier', status: 'scheduled', lead: 'Michael Park', startDate: '2026-03-20', endDate: '2026-03-22', findings: 0, observations: 0 },
   { id: 3, audit_id: 'AUD-2026-003', title: 'FDA Pre-Submission Audit Readiness', type: 'Regulatory', status: 'planning', lead: 'James Miller', startDate: '2026-04-01', endDate: '2026-04-05', findings: 0, observations: 0 },
   { id: 4, audit_id: 'AUD-2026-004', title: 'ISO 13485 Surveillance Audit — TÜV SÜD', type: 'External', status: 'completed', lead: 'Dr. Sarah Chen', startDate: '2026-02-01', endDate: '2026-02-03', findings: 2, observations: 5 },
@@ -96,7 +96,7 @@ export const equipment = [
 ];
 
 export const batchRecords = [
-  { id: 1, batch_id: 'BAT-2026-001', product: 'COVID-19 Rapid Antigen Test Kit', lot: 'LOT-2026-A-001', status: 'in_progress', startDate: '2026-03-01', yield: 94.2, units: 50000, step: 'Final QC' },
+  { id: 1, batch_id: 'BAT-2026-001', product: 'COVID-19 Rapid Antigen Test Kit', lot: 'LOT-2026-A-001', status: 'in_progress', startDate: '2026-02-28', yield: 94.2, units: 50000, step: 'Final QC' },
   { id: 2, batch_id: 'BAT-2026-002', product: 'HbA1c Assay Reagent Pack', lot: 'LOT-2026-B-002', status: 'completed', startDate: '2026-02-20', yield: 97.8, units: 25000, step: 'Released' },
   { id: 3, batch_id: 'BAT-2026-003', product: 'Troponin I Immunoassay', lot: 'LOT-2026-C-003', status: 'review', startDate: '2026-02-25', yield: 91.5, units: 15000, step: 'QA Review' },
 ];
@@ -114,14 +114,14 @@ export const dmrs = [
 export const correspondence = [
   { id: 1, correspondence_number: 'COR-2026-0001', subject: 'FDA 510(k) Pre-Submission Feedback', type: 'FDA', direction: 'INBOUND', status: 'action_required', priority: 'HIGH', sender: 'FDA CDRH', recipient: 'Dr. Sarah Chen', date: '2026-02-28', responseDeadline: '2026-03-14', isOverdue: false },
   { id: 2, correspondence_number: 'COR-2026-0002', subject: 'TÜV SÜD — ISO 13485 Audit Schedule', type: 'NOTIFIED_BODY', direction: 'INBOUND', status: 'acknowledged', priority: 'MEDIUM', sender: 'TÜV SÜD', recipient: 'James Miller', date: '2026-02-25', responseDeadline: '2026-03-10', isOverdue: false },
-  { id: 3, correspondence_number: 'COR-2026-0003', subject: 'Reagent Supplier Qualification Renewal', type: 'SUPPLIER', direction: 'OUTBOUND', status: 'sent', priority: 'LOW', sender: 'Michael Park', recipient: 'BioReagent Corp', date: '2026-03-01', responseDeadline: null, isOverdue: false },
-  { id: 4, correspondence_number: 'COR-2026-0004', subject: 'EU IVDR Technical Documentation Request', type: 'REGULATORY', direction: 'INBOUND', status: 'open', priority: 'URGENT', sender: 'EU Competent Authority', recipient: 'Dr. Sarah Chen', date: '2026-02-20', responseDeadline: '2026-03-01', isOverdue: true },
+  { id: 3, correspondence_number: 'COR-2026-0003', subject: 'Reagent Supplier Qualification Renewal', type: 'SUPPLIER', direction: 'OUTBOUND', status: 'sent', priority: 'LOW', sender: 'Michael Park', recipient: 'BioReagent Corp', date: '2026-02-28', responseDeadline: null, isOverdue: false },
+  { id: 4, correspondence_number: 'COR-2026-0004', subject: 'EU IVDR Technical Documentation Request', type: 'REGULATORY', direction: 'INBOUND', status: 'open', priority: 'URGENT', sender: 'EU Competent Authority', recipient: 'Dr. Sarah Chen', date: '2026-02-20', responseDeadline: '2026-02-28', isOverdue: true },
 ];
 
 export const validationDocs = [
   { id: 1, protocol_id: 'VAL-IQ-001', title: 'Installation Qualification — PCR System', type: 'IQ', status: 'completed', equipment: 'Bio-Rad CFX96', department: 'Lab', completeness: 100, date: '2026-01-15' },
   { id: 2, protocol_id: 'VAL-OQ-001', title: 'Operational Qualification — Microplate Reader', type: 'OQ', status: 'in_progress', equipment: 'Tecan Infinite M200', department: 'Lab', completeness: 65, date: '2026-02-20' },
-  { id: 3, protocol_id: 'VAL-PQ-001', title: 'Performance Qualification — LIMS v3.2', type: 'PQ', status: 'draft', equipment: 'LIMS Software', department: 'IT', completeness: 20, date: '2026-03-01' },
+  { id: 3, protocol_id: 'VAL-PQ-001', title: 'Performance Qualification — LIMS v3.2', type: 'PQ', status: 'draft', equipment: 'LIMS Software', department: 'IT', completeness: 20, date: '2026-02-28' },
   { id: 4, protocol_id: 'VAL-IQ-002', title: 'Installation Qualification — Laminar Flow Hood', type: 'IQ', status: 'completed', equipment: 'Baker SterilGARD', department: 'Cleanroom', completeness: 100, date: '2025-12-01' },
 ];
 

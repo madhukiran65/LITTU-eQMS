@@ -87,10 +87,10 @@ export default function Dashboard() {
   ];
 
   const upcomingDeadlines = [
-    { id: 1, item: 'CAPA-0004 Effectiveness Check', dueDate: '2026-03-05', days: 4, priority: 'high' },
-    { id: 2, item: 'FDA 510(k) Response Deadline', dueDate: '2026-03-14', days: 13, priority: 'high' },
-    { id: 3, item: 'Supplier Audit — ABC Reagents', dueDate: '2026-03-20', days: 19, priority: 'medium' },
-    { id: 4, item: 'Q1 Management Review', dueDate: '2026-03-28', days: 27, priority: 'medium' },
+    { id: 1, item: 'CAPA-0004 Effectiveness Check', dueDate: '2026-03-05', days: 5, priority: 'high' },
+    { id: 2, item: 'FDA 510(k) Response Deadline', dueDate: '2026-03-14', days: 14, priority: 'high' },
+    { id: 3, item: 'Supplier Audit — ABC Reagents', dueDate: '2026-03-20', days: 20, priority: 'medium' },
+    { id: 4, item: 'Q1 Management Review', dueDate: '2026-03-28', days: 28, priority: 'medium' },
   ];
 
   return (
