@@ -1,268 +1,204 @@
-import React, { useState } from 'react';
-import { suppliers } from '@/data/mockData';
-import StatusBadge from '@/components/common/StatusBadge';
-import { Building2, TrendingUp, AlertCircle, CheckCircle, Plus, Search, MapPin, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react'
+import { Plus, Search, Eye, Truck, Star } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import { suppliersAPI } from '../../api'
+import { supplierCreateSchema } from '../../validation/schemas'
+import StatusBadge from '../../components/common/StatusBadge'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+import EmptyState from '../../components/common/EmptyState'
+import Pagination from '../../components/common/Pagination'
+import Modal from '../../components/common/Modal'
+import FormField from '../../components/common/FormField'
 
 export default function Suppliers() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [sortBy, setSortBy] = useState('name');
+  const [suppliers, setSuppliers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [selected, setSelected] = useState(null)
+  const [showCreate, setShowCreate] = useState(false)
 
-  // Calculate statistics
-  const totalSuppliers = suppliers.length;
-  const approved = suppliers.filter(s => s.status === 'approved').length;
-  const conditional = suppliers.filter(s => s.status === 'conditional').length;
-  const atRisk = suppliers.filter(s => s.status === 'at_risk').length;
+  useEffect(() => { fetchSuppliers() }, [page, search])
 
-  // Filter suppliers
-  let filteredSuppliers = suppliers.filter(supplier => {
-    const matchesSearch = supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         String(supplier.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.category.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || supplier.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
-
-  // Sort suppliers
-  if (sortBy === 'name') {
-    filteredSuppliers.sort((a, b) => a.name.localeCompare(b.name));
-  } else if (sortBy === 'score') {
-    filteredSuppliers.sort((a, b) => b.score - a.score);
-  } else if (sortBy === 'status') {
-    const statusOrder = { approved: 0, conditional: 1, at_risk: 2 };
-    filteredSuppliers.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+  const fetchSuppliers = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data } = await suppliersAPI.list({ page, ...(search && { search }) })
+      setSuppliers(data.results || data || [])
+      setTotalCount(data.count || 0)
+    } catch (err) {
+      console.error('Failed to load suppliers:', err)
+      setError(err.message || 'Failed to load suppliers')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const getScoreColor = (score) => {
-    if (score >= 90) return { bar: 'bg-green-500', badge: 'text-green-400' };
-    if (score >= 70) return { bar: 'bg-yellow-500', badge: 'text-yellow-400' };
-    return { bar: 'bg-red-500', badge: 'text-red-400' };
-  };
-
-  const getScoreBgColor = (score) => {
-    if (score >= 90) return 'bg-green-900/20 border-green-700/50';
-    if (score >= 70) return 'bg-yellow-900/20 border-yellow-700/50';
-    return 'bg-red-900/20 border-red-700/50';
-  };
+  const handleCreate = async (formData) => {
+    try {
+      await suppliersAPI.create(formData)
+      setShowCreate(false)
+      fetchSuppliers()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to create supplier')
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-eqms-text">Supplier Quality Management</h1>
-        <button className="flex items-center gap-2 bg-eqms-accent hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition">
-          <Plus size={20} />
-          Add Supplier
-        </button>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Supplier Management</h1>
+        <p className="text-slate-400">Approved supplier list, evaluations, and supply chain intelligence</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-eqms-text-secondary text-sm font-medium">Total Suppliers</p>
-              <p className="text-3xl font-bold text-eqms-text mt-2">{totalSuppliers}</p>
-            </div>
-            <Building2 size={40} className="text-eqms-accent opacity-20" />
+      {error && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex justify-between items-center">
+          <span>{error}</span>
+          <button onClick={fetchSuppliers} className="text-red-300 hover:text-red-200 underline ml-4">Retry</button>
+        </div>
+      )}
+
+      <div className="card p-6 mb-6">
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <div className="flex-1 relative min-w-[250px]">
+            <Search className="absolute left-3 top-2.5 text-slate-500" size={20} />
+            <input
+              type="text"
+              placeholder="Search suppliers..."
+              className="input-field pl-10"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
           </div>
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> Add Supplier
+          </button>
         </div>
 
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-eqms-text-secondary text-sm font-medium">Approved</p>
-              <p className="text-3xl font-bold text-eqms-text mt-2">{approved}</p>
-            </div>
-            <CheckCircle size={40} className="text-green-500 opacity-20" />
-          </div>
-        </div>
-
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-eqms-text-secondary text-sm font-medium">Conditional</p>
-              <p className="text-3xl font-bold text-eqms-text mt-2">{conditional}</p>
-            </div>
-            <AlertCircle size={40} className="text-yellow-500 opacity-20" />
-          </div>
-        </div>
-
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-eqms-text-secondary text-sm font-medium">At Risk</p>
-              <p className="text-3xl font-bold text-eqms-text mt-2">{atRisk}</p>
-            </div>
-            <TrendingUp size={40} className="text-red-500 opacity-20" />
-          </div>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search size={18} className="absolute left-3 top-3 text-eqms-text-secondary" />
-          <input
-            type="text"
-            placeholder="Search by name, ID, or category..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-eqms-card border border-eqms-border rounded-lg pl-10 pr-4 py-2 text-eqms-text placeholder-eqms-text-secondary focus:outline-none focus:border-eqms-accent"
-          />
-        </div>
-
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="bg-eqms-card border border-eqms-border rounded-lg px-4 py-2 text-eqms-text focus:outline-none focus:border-eqms-accent"
-        >
-          <option value="all">All Statuses</option>
-          <option value="approved">Approved</option>
-          <option value="conditional">Conditional</option>
-          <option value="at_risk">At Risk</option>
-        </select>
-
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="bg-eqms-card border border-eqms-border rounded-lg px-4 py-2 text-eqms-text focus:outline-none focus:border-eqms-accent"
-        >
-          <option value="name">Sort by Name</option>
-          <option value="score">Sort by Score</option>
-          <option value="status">Sort by Status</option>
-        </select>
-      </div>
-
-      {/* Suppliers Table */}
-      <div className="bg-eqms-card border border-eqms-border rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-eqms-dark border-b border-eqms-border">
-                <th className="text-left py-4 px-6 text-eqms-text-secondary font-semibold">ID</th>
-                <th className="text-left py-4 px-6 text-eqms-text-secondary font-semibold">Name</th>
-                <th className="text-left py-4 px-6 text-eqms-text-secondary font-semibold">Category</th>
-                <th className="text-center py-4 px-6 text-eqms-text-secondary font-semibold">Status</th>
-                <th className="text-left py-4 px-6 text-eqms-text-secondary font-semibold">Score</th>
-                <th className="text-left py-4 px-6 text-eqms-text-secondary font-semibold">Location</th>
-                <th className="text-center py-4 px-6 text-eqms-text-secondary font-semibold">Last Audit</th>
-                <th className="text-center py-4 px-6 text-eqms-text-secondary font-semibold">Next Audit</th>
-                <th className="text-center py-4 px-6 text-eqms-text-secondary font-semibold">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSuppliers.map((supplier, idx) => {
-                const scoreColor = getScoreColor(supplier.score);
-                const scoreBg = getScoreBgColor(supplier.score);
-
-                return (
-                  <tr
-                    key={supplier.id}
-                    className={`border-b border-eqms-border hover:bg-eqms-dark/50 transition ${
-                      idx % 2 === 0 ? 'bg-transparent' : 'bg-eqms-dark/20'
-                    }`}
-                  >
-                    <td className="py-4 px-6 font-mono text-eqms-accent font-medium">{supplier.id}</td>
-
-                    <td className="py-4 px-6">
-                      <div className="flex flex-col">
-                        <p className="text-eqms-text font-medium">{supplier.name}</p>
-                        <p className="text-xs text-eqms-text-secondary mt-1">{supplier.contact}</p>
-                      </div>
-                    </td>
-
-                    <td className="py-4 px-6">
-                      <span className="text-eqms-text-secondary">{supplier.category}</span>
-                    </td>
-
-                    <td className="py-4 px-6 text-center">
-                      <StatusBadge status={supplier.status} />
-                    </td>
-
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <div className="w-full bg-eqms-dark rounded-full h-2">
-                            <div
-                              className={`${scoreColor.bar} rounded-full h-2 transition`}
-                              style={{ width: `${supplier.score}%` }}
-                            />
-                          </div>
-                        </div>
-                        <div className={`px-3 py-1 rounded border text-xs font-semibold ${scoreBg} ${scoreColor.badge}`}>
-                          {supplier.score}
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-2">
-                        <MapPin size={16} className="text-eqms-text-secondary" />
-                        <span className="text-eqms-text-secondary">{supplier.location}</span>
-                      </div>
-                    </td>
-
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex items-center justify-center gap-2 text-eqms-text-secondary text-xs">
-                        <Calendar size={14} />
-                        {supplier.lastAuditDate}
-                      </div>
-                    </td>
-
-                    <td className="py-4 px-6 text-center">
-                      <div className="flex items-center justify-center gap-2 text-eqms-text-secondary text-xs">
-                        <Calendar size={14} />
-                        {supplier.nextAuditDate}
-                      </div>
-                    </td>
-
-                    <td className="py-4 px-6 text-center">
-                      <button className="text-eqms-accent hover:text-eqms-accent/80 transition font-medium text-sm">
-                        Review
-                      </button>
-                    </td>
+        {loading ? (
+          <LoadingSpinner />
+        ) : !suppliers.length ? (
+          <EmptyState icon={Truck} title="No suppliers found" message="Add your first supplier to the approved list" />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-eqms-border">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Supplier ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Name</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Category</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Rating</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Location</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Actions</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredSuppliers.length === 0 && (
-          <div className="text-center py-12 px-6">
-            <p className="text-eqms-text-secondary">No suppliers found matching your criteria</p>
-          </div>
+                </thead>
+                <tbody>
+                  {suppliers.map((s) => (
+                    <tr key={s.id} className="border-b border-eqms-border hover:bg-slate-800/50 transition">
+                      <td className="py-3 px-4 font-mono text-blue-400">{s.supplier_id || s.id}</td>
+                      <td className="py-3 px-4 font-medium">{s.name || s.company_name}</td>
+                      <td className="py-3 px-4 text-slate-400">{s.category || s.supplier_type || '—'}</td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={s.status} />
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1">
+                          <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                          <span className="font-medium">{s.rating || s.overall_score || '—'}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">{s.location || s.city || '—'}</td>
+                      <td className="py-3 px-4">
+                        <button 
+                          onClick={() => setSelected(s)}
+                          className="p-2 rounded hover:bg-slate-700 transition"
+                        >
+                          <Eye size={16} className="text-slate-400" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalCount={totalCount} onPageChange={setPage} />
+          </>
         )}
       </div>
 
-      {/* Legend */}
-      <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-        <h3 className="text-sm font-semibold text-eqms-text mb-4">Score Color Coding</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-4 h-4 bg-green-500 rounded"></div>
+      {/* Create Modal */}
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Add Supplier" size="lg">
+        <CreateSupplierForm onSubmit={handleCreate} onCancel={() => setShowCreate(false)} />
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={selected?.name || 'Supplier Detail'} size="lg">
+        {selected && (
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm font-medium text-eqms-text">90+</p>
-              <p className="text-xs text-eqms-text-secondary">Excellent</p>
+              <span className="text-xs text-slate-500">Supplier ID</span>
+              <p className="font-mono text-blue-400">{selected.supplier_id || selected.id}</p>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-4 h-4 bg-yellow-500 rounded"></div>
             <div>
-              <p className="text-sm font-medium text-eqms-text">70-89</p>
-              <p className="text-xs text-eqms-text-secondary">Good</p>
+              <span className="text-xs text-slate-500">Status</span>
+              <p><StatusBadge status={selected.status} /></p>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-4 h-4 bg-red-500 rounded"></div>
             <div>
-              <p className="text-sm font-medium text-eqms-text">Below 70</p>
-              <p className="text-xs text-eqms-text-secondary">Needs Improvement</p>
+              <span className="text-xs text-slate-500">Category</span>
+              <p className="text-sm">{selected.category || selected.supplier_type || '—'}</p>
             </div>
+            <div>
+              <span className="text-xs text-slate-500">Rating</span>
+              <p className="text-sm font-medium">{selected.rating || selected.overall_score || '—'}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Location</span>
+              <p className="text-sm">{selected.location || selected.city || '—'}</p>
+            </div>
+            {selected.description && (
+              <div className="col-span-2">
+                <span className="text-xs text-slate-500">Description</span>
+                <p className="text-sm text-slate-300 mt-1">{selected.description}</p>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
+        )}
+      </Modal>
     </div>
-  );
+  )
+}
+
+function CreateSupplierForm({ onSubmit, onCancel }) {
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: yupResolver(supplierCreateSchema),
+    defaultValues: { name: '', supplier_type: '', contact_email: '', contact_phone: '' },
+    mode: 'onBlur',
+  })
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <FormField label="Supplier Name" error={errors.name?.message} required>
+        <input {...register('name')} className={`input-field ${errors.name ? 'border-red-500/50' : ''}`} placeholder="Enter supplier name" />
+      </FormField>
+      <FormField label="Supplier Type" error={errors.supplier_type?.message} required>
+        <input {...register('supplier_type')} className={`input-field ${errors.supplier_type ? 'border-red-500/50' : ''}`} placeholder="Enter supplier type" />
+      </FormField>
+      <FormField label="Contact Email" error={errors.contact_email?.message}>
+        <input type="email" {...register('contact_email')} className={`input-field ${errors.contact_email ? 'border-red-500/50' : ''}`} placeholder="Enter email address" />
+      </FormField>
+      <FormField label="Contact Phone" error={errors.contact_phone?.message}>
+        <input {...register('contact_phone')} className={`input-field ${errors.contact_phone ? 'border-red-500/50' : ''}`} placeholder="Enter phone number" />
+      </FormField>
+      <div className="flex justify-end gap-2 pt-4 border-t border-eqms-border">
+        <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
+        <button type="submit" className="btn-primary">Add Supplier</button>
+      </div>
+    </form>
+  )
 }

@@ -1,31 +1,75 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme {
-  --color-eqms-dark: #0B0F1A;
-  --color-eqms-darker: #060912;
-  --color-eqms-card: #141B2D;
-  --color-eqms-card-hover: #1A2338;
-  --color-eqms-border: #1E293B;
-  --color-eqms-accent: #3B82F6;
-  --color-eqms-accent-hover: #2563EB;
-  --color-eqms-success: #10B981;
-  --color-eqms-warning: #F59E0B;
-  --color-eqms-danger: #EF4444;
-  --color-eqms-info: #06B6D4;
-  --color-eqms-purple: #8B5CF6;
-  --color-eqms-text: #E2E8F0;
-  --color-eqms-text-dim: #94A3B8;
-  --color-eqms-text-muted: #64748B;
+/* Default dark theme CSS variables (applied before React hydration) */
+:root {
+  --bg-primary: #0B0F1A;
+  --bg-secondary: #141B2D;
+  --bg-sidebar: #0F172A;
+  --bg-input: #1A2235;
+  --bg-card: #141B2D;
+  --border-color: #1F2A40;
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-heading: #F8FAFC;
+  --scrollbar-thumb: #334155;
+  --table-header-bg: rgba(30, 41, 59, 0.5);
+  --hover-bg: rgba(30, 41, 59, 0.5);
+  --modal-overlay: rgba(0, 0, 0, 0.6);
 }
 
-body {
-  margin: 0;
-  background: #0B0F1A;
-  color: #E2E8F0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+@layer base {
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    @apply font-sans antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
 }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0B0F1A; }
-::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #334155; }
+@layer components {
+  .card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    @apply rounded-xl;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }
+  .btn-primary {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white px-5 py-2.5 rounded-lg font-semibold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-shadow;
+  }
+  .btn-secondary {
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    @apply px-4 py-2 rounded-lg text-sm transition-colors;
+  }
+  .btn-secondary:hover {
+    background-color: var(--border-color);
+  }
+  .input-field {
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    @apply rounded-lg px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 w-full;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Theme-aware text utilities */
+  .text-theme-primary { color: var(--text-primary); }
+  .text-theme-secondary { color: var(--text-secondary); }
+  .text-theme-muted { color: var(--text-muted); }
+  .text-theme-heading { color: var(--text-heading); }
+  .bg-theme-primary { background-color: var(--bg-primary); }
+  .bg-theme-secondary { background-color: var(--bg-secondary); }
+  .bg-theme-card { background-color: var(--bg-card); }
+  .bg-theme-input { background-color: var(--bg-input); }
+  .bg-theme-sidebar { background-color: var(--bg-sidebar); }
+  .border-theme { border-color: var(--border-color); }
+  .bg-theme-hover:hover { background-color: var(--hover-bg); }
+  .bg-theme-table-header { background-color: var(--table-header-bg); }
+}

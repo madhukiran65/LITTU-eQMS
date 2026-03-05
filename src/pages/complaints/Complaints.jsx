@@ -1,361 +1,280 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Plus, AlertTriangle, Clock } from 'lucide-react';
-import { complaints } from '@/data/mockData';
-import StatusBadge from '@/components/common/StatusBadge';
+import React, { useState, useEffect } from 'react'
+import { Plus, Search, Eye, MessageSquare } from 'lucide-react'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import { complaintsAPI } from '../../api'
+import { complaintCreateSchema } from '../../validation/schemas'
+import StatusBadge from '../../components/common/StatusBadge'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+import EmptyState from '../../components/common/EmptyState'
+import Pagination from '../../components/common/Pagination'
+import Modal from '../../components/common/Modal'
+import FormField from '../../components/common/FormField'
+import RichTextEditor from '../../components/common/RichTextEditor'
+import RichTextViewer from '../../components/common/RichTextViewer'
 
-const Complaints = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [severityFilter, setSeverityFilter] = useState('all');
+export default function Complaints() {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
 
-  const statuses = ['open', 'investigating', 'resolved', 'closed'];
-  const severities = ['Critical', 'High', 'Medium', 'Low'];
+  useEffect(() => { fetchItems() }, [page, search, statusFilter])
 
-  const filteredComplaints = useMemo(() => {
-    return complaints.filter((complaint) => {
-      const matchesSearch =
-        String(complaint.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        complaint.title.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || complaint.status === statusFilter;
-      const matchesSeverity =
-        severityFilter === 'all' || complaint.severity === severityFilter;
-      return matchesSearch && matchesStatus && matchesSeverity;
-    });
-  }, [searchTerm, statusFilter, severityFilter]);
-
-  const stats = {
-    open: complaints.filter((c) => c.status === 'open').length,
-    underInvestigation: complaints.filter((c) => c.status === 'investigating').length,
-    mdrDue: complaints.filter(
-      (c) =>
-        c.mdrRequired &&
-        c.mdrDeadline &&
-        new Date(c.mdrDeadline) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    ).length,
-    critical: complaints.filter((c) => c.severity === 'Critical').length,
-  };
-
-  const mdrAlertComplaints = complaints.filter(
-    (c) =>
-      c.mdrRequired &&
-      c.mdrDeadline &&
-      new Date(c.mdrDeadline) < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
-  );
-
-  const getDaysUntilDeadline = (deadline) => {
-    const now = new Date();
-    const deadlineDate = new Date(deadline);
-    const diffTime = deadlineDate - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const getMDRBadgeText = (daysUntilDeadline) => {
-    if (daysUntilDeadline <= 5) {
-      return `MDR Due in ${Math.max(0, daysUntilDeadline)}d`;
+  const fetchItems = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params = { page, ...(search && { search }), ...(statusFilter && { status: statusFilter }) }
+      const { data } = await complaintsAPI.list(params)
+      setItems(data.results || data || [])
+      setTotalCount(data.count || 0)
+    } catch (err) {
+      console.error('Failed to load complaints:', err)
+      setError(err.message || 'Failed to load complaints')
+    } finally {
+      setLoading(false)
     }
-    return `MDR Due in ${daysUntilDeadline}d`;
-  };
+  }
+
+  const handleCreate = async (formData) => {
+    setCreating(true)
+    try {
+      await complaintsAPI.create(formData)
+      setShowCreate(false)
+      fetchItems()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to create complaint')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-eqms-dark p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-eqms-text mb-2">Complaints & PMS</h1>
-          <p className="text-eqms-text-secondary">Manage customer complaints and adverse events</p>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Complaints & PMS</h1>
+        <p className="text-slate-400">Manage customer complaints and post-market surveillance</p>
+      </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex justify-between items-center">
+          <span>{error}</span>
+          <button onClick={fetchItems} className="text-red-300 hover:text-red-200 underline ml-4">Retry</button>
+        </div>
+      )}
+
+      <div className="card p-6 mb-6">
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <div className="flex-1 relative min-w-[250px]">
+            <Search className="absolute left-3 top-2.5 text-slate-500" size={20} />
+            <input
+              type="text"
+              placeholder="Search complaints..."
+              className="input-field pl-10"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
+          </div>
+          <select 
+            value={statusFilter} 
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} 
+            className="input-field w-auto"
+          >
+            <option value="">All Statuses</option>
+            <option value="received">Received</option>
+            <option value="assessment">Assessment</option>
+            <option value="investigation">Investigation</option>
+            <option value="action">Action</option>
+            <option value="closure">Closure</option>
+            <option value="closed">Closed</option>
+          </select>
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> New Complaint
+          </button>
         </div>
 
-        {/* MDR Alert Banner */}
-        {mdrAlertComplaints.length > 0 && (
-          <div className="mb-8 bg-red-900/20 border border-red-700 rounded-lg p-4 flex items-start gap-4">
-            <AlertTriangle size={24} className="text-red-500 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-red-400 mb-1">
-                FDA MDR Deadline Alert
-              </h3>
-              <p className="text-red-300 text-sm mb-3">
-                {mdrAlertComplaints.length} complaint(s) require FDA MDR reporting within the next 3 days.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {mdrAlertComplaints.map((c) => (
-                  <span
-                    key={c.id}
-                    className="text-xs bg-red-800 text-red-100 px-2 py-1 rounded"
-                  >
-                    {c.id}: {getDaysUntilDeadline(c.mdrDeadline)}d remaining
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2">Open Complaints</p>
-            <p className="text-3xl font-bold text-eqms-text">{stats.open}</p>
-          </div>
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2">Under Investigation</p>
-            <p className="text-3xl font-bold text-eqms-text">{stats.underInvestigation}</p>
-          </div>
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2 flex items-center gap-2">
-              <Clock size={16} className="text-orange-500" />
-              MDR Reports Due
-            </p>
-            <p className="text-3xl font-bold text-orange-500">{stats.mdrDue}</p>
-          </div>
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2 flex items-center gap-2">
-              <AlertTriangle size={16} className="text-red-500" />
-              Critical
-            </p>
-            <p className="text-3xl font-bold text-red-500">{stats.critical}</p>
-          </div>
-        </div>
-
-        {/* Filter Bar */}
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-4 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search
-                size={18}
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-eqms-text-secondary"
-              />
-              <input
-                type="text"
-                placeholder="Search complaint ID or title..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-eqms-dark border border-eqms-border rounded text-eqms-text placeholder-eqms-text-secondary focus:outline-none focus:border-eqms-accent"
-              />
-            </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 bg-eqms-dark border border-eqms-border rounded text-eqms-text focus:outline-none focus:border-eqms-accent"
-            >
-              <option value="all">All Statuses</option>
-              {statuses.map((status) => (
-                <option key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </option>
-              ))}
-            </select>
-            <select
-              value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value)}
-              className="px-4 py-2 bg-eqms-dark border border-eqms-border rounded text-eqms-text focus:outline-none focus:border-eqms-accent"
-            >
-              <option value="all">All Severities</option>
-              {severities.map((severity) => (
-                <option key={severity} value={severity}>
-                  {severity}
-                </option>
-              ))}
-            </select>
-            <button className="px-4 py-2 bg-eqms-accent text-eqms-dark font-semibold rounded hover:bg-opacity-90 transition flex items-center justify-center gap-2">
-              <Plus size={18} />
-              Log Complaint
-            </button>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-eqms-card border border-eqms-border rounded-lg overflow-hidden mb-8">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-eqms-border bg-eqms-dark/50">
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Complaint ID
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Title
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Severity
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Source
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    MDR Required
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Created
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredComplaints.map((complaint) => {
-                  const daysUntilMDR = complaint.mdrRequired
-                    ? getDaysUntilDeadline(complaint.mdrDeadline)
-                    : null;
-                  const isMDRCritical = complaint.mdrRequired && daysUntilMDR <= 5;
-
-                  return (
-                    <tr
-                      key={complaint.id}
-                      className="border-b border-eqms-border hover:bg-eqms-dark/50 transition"
-                    >
-                      <td className="px-6 py-4 text-sm font-medium text-eqms-accent">
-                        {complaint.id}
+        {loading ? (
+          <LoadingSpinner />
+        ) : !items.length ? (
+          <EmptyState icon={MessageSquare} title="No complaints found" message="Create your first complaint record" />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-eqms-border">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Complaint ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Subject</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Severity</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Received From</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Date Received</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-b border-eqms-border hover:bg-slate-800/50 transition">
+                      <td className="py-3 px-4 font-mono text-blue-400">{item.complaint_id || item.id}</td>
+                      <td className="py-3 px-4 font-medium">{item.subject || item.title}</td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={item.status} />
                       </td>
-                      <td className="px-6 py-4 text-sm text-eqms-text">{complaint.title}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <StatusBadge
-                          status={complaint.status}
-                          label={complaint.status.charAt(0).toUpperCase() + complaint.status.slice(1)}
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <StatusBadge
-                          status={complaint.severity.toLowerCase()}
-                          label={complaint.severity}
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-sm text-eqms-text-secondary">
-                        {complaint.source}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        {complaint.mdrRequired ? (
-                          <div
-                            className={`inline-flex items-center gap-2 px-3 py-1 rounded text-xs font-medium ${
-                              isMDRCritical
-                                ? 'bg-red-900/40 text-red-300 border border-red-700'
-                                : 'bg-orange-900/40 text-orange-300 border border-orange-700'
-                            }`}
-                          >
-                            <AlertTriangle size={14} />
-                            {getMDRBadgeText(daysUntilMDR)}
-                          </div>
-                        ) : (
-                          <span className="text-eqms-text-secondary">—</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-eqms-text-secondary">
-                        {new Date(complaint.createdDate).toLocaleDateString()}
+                      <td className="py-3 px-4 text-slate-400">{item.severity || '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{item.received_from || item.customer_name || '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{item.date_received || item.created_at?.slice(0,10) || '—'}</td>
+                      <td className="py-3 px-4">
+                        <button 
+                          onClick={() => setSelectedItem(item)}
+                          className="p-2 rounded hover:bg-slate-700 transition"
+                        >
+                          <Eye size={16} className="text-slate-400" />
+                        </button>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalCount={totalCount} onPageChange={setPage} />
+          </>
+        )}
+      </div>
+
+      {/* Create Modal */}
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Create New Complaint" size="lg">
+        <CreateComplaintForm onSubmit={handleCreate} loading={creating} onCancel={() => setShowCreate(false)} />
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} title={selectedItem?.subject || 'Complaint Detail'} size="lg">
+        {selectedItem && <ComplaintDetail complaint={selectedItem} onClose={() => setSelectedItem(null)} onRefresh={fetchItems} />}
+      </Modal>
+    </div>
+  )
+}
+
+function CreateComplaintForm({ onSubmit, loading, onCancel }) {
+  const { register, handleSubmit, control, formState: { errors } } = useForm({
+    resolver: yupResolver(complaintCreateSchema),
+    defaultValues: { title: '', description: '', complaint_source: '', product: '', severity: 'medium', received_date: '' },
+    mode: 'onBlur',
+  })
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <FormField label="Title" error={errors.title?.message} required>
+        <input {...register('title')} className={`input-field ${errors.title ? 'border-red-500/50' : ''}`} placeholder="Enter complaint title" />
+      </FormField>
+      <FormField label="Description" error={errors.description?.message} required helpText="Minimum 20 characters — use rich text for detailed descriptions">
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <RichTextEditor
+              value={field.value}
+              onChange={field.onChange}
+              placeholder="Describe the complaint details..."
+              minHeight="180px"
+              error={!!errors.description}
+            />
+          )}
+        />
+      </FormField>
+      <FormField label="Complaint Source" error={errors.complaint_source?.message} required>
+        <input {...register('complaint_source')} className={`input-field ${errors.complaint_source ? 'border-red-500/50' : ''}`} placeholder="Enter complaint source" />
+      </FormField>
+      <FormField label="Product" error={errors.product?.message} required>
+        <input {...register('product')} className={`input-field ${errors.product ? 'border-red-500/50' : ''}`} placeholder="Enter product name" />
+      </FormField>
+      <FormField label="Severity" error={errors.severity?.message} required>
+        <select {...register('severity')} className="input-field">
+          <option value="">Select severity</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+      </FormField>
+      <FormField label="Received Date" error={errors.received_date?.message} required>
+        <input type="date" {...register('received_date')} className={`input-field ${errors.received_date ? 'border-red-500/50' : ''}`} />
+      </FormField>
+      <div className="flex justify-end gap-2 pt-4 border-t border-eqms-border">
+        <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
+        <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Creating...' : 'Create Complaint'}</button>
+      </div>
+    </form>
+  )
+}
+
+function ComplaintDetail({ complaint, onClose, onRefresh }) {
+  const [auditTrail, setAuditTrail] = useState([])
+  const [tab, setTab] = useState('details')
+
+  useEffect(() => {
+    if (complaint.id && complaintsAPI.auditTrail) {
+      complaintsAPI.auditTrail(complaint.id).then(r => setAuditTrail(r.data || [])).catch(() => {})
+    }
+  }, [complaint.id])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 border-b border-eqms-border pb-2">
+        {['details', 'audit_trail'].map(t => (
+          <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm rounded ${tab === t ? 'bg-blue-500/10 text-blue-400 font-medium' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t === 'details' ? 'Details' : 'Audit Trail'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'details' && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <span className="text-xs text-slate-500">Complaint ID</span>
+            <p className="font-mono text-blue-400">{complaint.complaint_id || complaint.id}</p>
           </div>
-          {filteredComplaints.length === 0 && (
-            <div className="px-6 py-12 text-center">
-              <p className="text-eqms-text-secondary">
-                No complaints found matching your criteria
-              </p>
+          <div>
+            <span className="text-xs text-slate-500">Status</span>
+            <p><StatusBadge status={complaint.status} /></p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Severity</span>
+            <p className="text-sm">{complaint.severity || '—'}</p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Date Received</span>
+            <p className="text-sm">{complaint.date_received || '—'}</p>
+          </div>
+          {complaint.description && (
+            <div className="col-span-2">
+              <span className="text-xs text-slate-500">Description</span>
+              <RichTextViewer content={complaint.description} className="mt-1" />
             </div>
           )}
         </div>
+      )}
 
-        {/* FDA MDR Section */}
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-eqms-text mb-4 flex items-center gap-2">
-            <AlertTriangle size={20} className="text-orange-500" />
-            FDA MDR Reporting Dashboard
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="bg-eqms-dark rounded p-4 border border-eqms-border">
-              <p className="text-sm text-eqms-text-secondary mb-2">5-Day Deadline</p>
-              <p className="text-2xl font-bold text-red-500">
-                {complaints.filter(
-                  (c) =>
-                    c.mdrRequired &&
-                    getDaysUntilDeadline(c.mdrDeadline) <= 5 &&
-                    getDaysUntilDeadline(c.mdrDeadline) > 0
-                ).length}
-              </p>
-              <p className="text-xs text-eqms-text-secondary mt-2">
-                Complaints requiring urgent FDA notification
-              </p>
-            </div>
-            <div className="bg-eqms-dark rounded p-4 border border-eqms-border">
-              <p className="text-sm text-eqms-text-secondary mb-2">30-Day Deadline</p>
-              <p className="text-2xl font-bold text-orange-500">
-                {complaints.filter(
-                  (c) =>
-                    c.mdrRequired &&
-                    getDaysUntilDeadline(c.mdrDeadline) > 5 &&
-                    getDaysUntilDeadline(c.mdrDeadline) <= 30
-                ).length}
-              </p>
-              <p className="text-xs text-eqms-text-secondary mt-2">
-                Complaints pending 30-day notification
-              </p>
-            </div>
-          </div>
-
-          <div className="border-t border-eqms-border pt-6">
-            <h3 className="text-sm font-semibold text-eqms-text mb-4">
-              Reportable Complaints (MDR Required)
-            </h3>
-            {complaints.filter((c) => c.mdrRequired).length > 0 ? (
-              <div className="space-y-3">
-                {complaints
-                  .filter((c) => c.mdrRequired)
-                  .map((complaint) => {
-                    const daysUntilMDR = getDaysUntilDeadline(complaint.mdrDeadline);
-                    const isDue = daysUntilMDR <= 5;
-
-                    return (
-                      <div
-                        key={complaint.id}
-                        className={`p-4 rounded border ${
-                          isDue
-                            ? 'bg-red-900/20 border-red-700'
-                            : 'bg-eqms-dark border-eqms-border'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium text-eqms-text">{complaint.id}: {complaint.title}</p>
-                            <p className="text-sm text-eqms-text-secondary mt-1">
-                              Severity: {complaint.severity} | Source: {complaint.source}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p
-                              className={`font-semibold ${
-                                isDue ? 'text-red-400' : 'text-eqms-accent'
-                              }`}
-                            >
-                              {daysUntilMDR}d remaining
-                            </p>
-                            <p className="text-xs text-eqms-text-secondary mt-1">
-                              Due: {new Date(complaint.mdrDeadline).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+      {tab === 'audit_trail' && (
+        <div className="space-y-2">
+          {auditTrail.length ? auditTrail.map((entry, i) => (
+            <div key={i} className="p-3 bg-slate-800 rounded text-sm border border-slate-700">
+              <div className="flex justify-between mb-1">
+                <span className="font-medium">{entry.action}</span>
+                <span className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleString()}</span>
               </div>
-            ) : (
-              <p className="text-eqms-text-secondary text-sm">
-                No complaints currently require MDR reporting.
-              </p>
-            )}
-          </div>
+              <p className="text-slate-400 text-xs">{entry.user} — {entry.details}</p>
+            </div>
+          )) : <p className="text-sm text-slate-500">No audit trail entries</p>}
         </div>
-
-        {/* Results Count */}
-        <div className="mt-4 text-sm text-eqms-text-secondary">
-          Showing {filteredComplaints.length} of {complaints.length} complaints
-        </div>
-      </div>
+      )}
     </div>
-  );
-};
+  )
+}
 
-export default Complaints;

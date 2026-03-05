@@ -1,240 +1,182 @@
-import { useState } from 'react';
-import {
-  FileText,
-  AlertCircle,
-  TrendingUp,
-  Users,
-  Clock,
-  CheckCircle,
-  Calendar,
-  Activity,
-  BarChart3,
-  Target,
-} from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { dashboardKPIs, qualityTrend } from '@/data/mockData';
-import StatusBadge from '@/components/common/StatusBadge';
+import React, { useState, useEffect, useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { FileText, CheckCircle, Clock, AlertTriangle, AlertCircle, Target, Shield, BookOpen, TrendingUp, Plus, ArrowUpRight } from 'lucide-react'
+import { analyticsAPI } from '../../api'
+import { AuthContext } from '../../contexts/AuthContext'
+import { useIsMobile } from '../../hooks/useMediaQuery'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+
+const COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4']
 
 export default function Dashboard() {
-  const [selectedModule, setSelectedModule] = useState(null);
+  const { user } = useContext(AuthContext)
+  const navigate = useNavigate()
+  const isMobile = useIsMobile()
+  const [dashboard, setDashboard] = useState(null)
+  const [kpis, setKpis] = useState(null)
+  const [capaTrends, setCapaTrends] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
+  useEffect(() => {
+    loadDashboard()
+  }, [])
+
+  const loadDashboard = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [dashRes, kpiRes, capaRes] = await Promise.allSettled([
+        analyticsAPI.dashboard(),
+        analyticsAPI.kpis(),
+        analyticsAPI.trends.capa(),
+      ])
+      if (dashRes.status === 'fulfilled') setDashboard(dashRes.value.data)
+      if (kpiRes.status === 'fulfilled') setKpis(kpiRes.value.data)
+      if (capaRes.status === 'fulfilled') setCapaTrends(capaRes.value.data?.monthly_data || capaRes.value.data || [])
+    } catch (err) {
+      console.error('Dashboard load error:', err)
+      setError(err.message || 'Failed to load dashboard')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) return <LoadingSpinner message="Loading dashboard..." />
+
+  const cards = dashboard?.summary_cards || {}
+  const recentActivity = dashboard?.recent_activity || []
+
+  // Build KPI data from API or fallback
   const kpiCards = [
-    {
-      id: 1,
-      label: 'Total Documents',
-      value: dashboardKPIs.totalDocuments,
-      icon: FileText,
-      color: 'text-blue-400',
-      bgColor: 'bg-blue-500/10',
-    },
-    {
-      id: 2,
-      label: 'Open CAPAs',
-      value: dashboardKPIs.openCAPAs,
-      icon: AlertCircle,
-      color: 'text-red-400',
-      bgColor: 'bg-red-500/10',
-    },
-    {
-      id: 3,
-      label: 'Quality Score',
-      value: `${dashboardKPIs.qualityScore}%`,
-      icon: TrendingUp,
-      color: 'text-green-400',
-      bgColor: 'bg-green-500/10',
-    },
-    {
-      id: 4,
-      label: 'Training Compliance',
-      value: `${dashboardKPIs.trainingCompliance}%`,
-      icon: Users,
-      color: 'text-purple-400',
-      bgColor: 'bg-purple-500/10',
-    },
-    {
-      id: 5,
-      label: 'Open Deviations',
-      value: dashboardKPIs.openDeviations,
-      icon: Clock,
-      color: 'text-yellow-400',
-      bgColor: 'bg-yellow-500/10',
-    },
-    {
-      id: 6,
-      label: 'Overdue Items',
-      value: dashboardKPIs.overdueItems,
-      icon: CheckCircle,
-      color: 'text-orange-400',
-      bgColor: 'bg-orange-500/10',
-    },
-  ];
+    { icon: FileText, label: 'Total Documents', value: cards.total_documents ?? kpis?.total_documents ?? '—', color: 'text-blue-400', glow: 'bg-blue-500/10' },
+    { icon: Target, label: 'Open CAPAs', value: cards.open_capas ?? kpis?.open_capas ?? '—', color: 'text-yellow-400', glow: 'bg-yellow-500/10' },
+    { icon: AlertTriangle, label: 'Open Deviations', value: cards.open_deviations ?? '—', color: 'text-orange-400', glow: 'bg-orange-500/10' },
+    { icon: CheckCircle, label: 'Compliance Score', value: kpis?.compliance_rate ? `${kpis.compliance_rate}%` : (cards.training_compliance ? `${cards.training_compliance}%` : '—'), color: 'text-green-400', glow: 'bg-green-500/10' },
+    { icon: Shield, label: 'Overdue Training', value: cards.overdue_training ?? kpis?.overdue_training ?? '—', color: 'text-red-400', glow: 'bg-red-500/10' },
+  ]
 
-  const modules = [
-    { name: 'Document Management', progress: 85, status: 'active', docs: 234 },
-    { name: 'Quality Management', progress: 72, status: 'active', docs: 156 },
-    { name: 'Change Control', progress: 68, status: 'active', docs: 89 },
-    { name: 'Training & Competency', progress: 91, status: 'active', docs: 203 },
-    { name: 'Risk Management', progress: 78, status: 'active', docs: 112 },
-    { name: 'Supplier Management', progress: 65, status: 'review', docs: 45 },
-  ];
-
-  const recentActivity = [
-    { id: 1, action: 'Document Approved', item: 'SOP-2026-001', user: 'Dr. Sarah Chen', time: '2 hours ago', status: 'success' },
-    { id: 2, action: 'CAPA Created', item: 'CAPA-2026-0001', user: 'James Miller', time: '4 hours ago', status: 'warning' },
-    { id: 3, action: 'Deviation Logged', item: 'DEV-2026-0003', user: 'Michael Park', time: '6 hours ago', status: 'error' },
-    { id: 4, action: 'Training Completed', item: 'TRN-002 (21 CFR Part 11)', user: 'Emily Rodriguez', time: '8 hours ago', status: 'success' },
-    { id: 5, action: 'Audit Started', item: 'AUD-2026-001', user: 'Dr. Sarah Chen', time: '1 day ago', status: 'info' },
-  ];
-
-  const upcomingDeadlines = [
-    { id: 1, item: 'CAPA-0004 Effectiveness Check', dueDate: '2026-03-05', days: 5, priority: 'high' },
-    { id: 2, item: 'FDA 510(k) Response Deadline', dueDate: '2026-03-14', days: 14, priority: 'high' },
-    { id: 3, item: 'Supplier Audit — ABC Reagents', dueDate: '2026-03-20', days: 20, priority: 'medium' },
-    { id: 4, item: 'Q1 Management Review', dueDate: '2026-03-28', days: 28, priority: 'medium' },
-  ];
+  // CAPA pie chart data
+  const capaStatusData = dashboard?.capa_summary ? Object.entries(dashboard.capa_summary).map(([name, value], i) => ({
+    name: name.replace(/_/g, ' '),
+    value,
+    fill: COLORS[i % COLORS.length]
+  })).filter(d => d.value > 0) : []
 
   return (
-    <div className="min-h-screen bg-eqms-dark p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-eqms-text mb-2">Dashboard</h1>
-          <p className="text-eqms-text-secondary">Welcome back! Here's your compliance overview.</p>
+    <div className={`${isMobile ? 'p-4' : 'p-6'} space-y-6`}>
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <span>{error}</span>
+          <button onClick={loadDashboard} className="text-red-300 hover:text-red-200 underline whitespace-nowrap">Retry</button>
         </div>
+      )}
 
-        {/* KPI Cards Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 mb-8">
-          {kpiCards.map((kpi) => {
-            const IconComponent = kpi.icon;
-            return (
-              <div key={kpi.id} className="bg-eqms-card rounded-lg p-6 border border-eqms-border hover:border-eqms-border-hover transition-colors">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`${kpi.bgColor} rounded-lg p-3`}>
-                    <IconComponent className={`${kpi.color} w-6 h-6`} />
-                  </div>
-                </div>
-                <p className="text-eqms-text-secondary text-sm mb-1">{kpi.label}</p>
-                <p className="text-2xl font-bold text-eqms-text">{kpi.value}</p>
-              </div>
-            );
-          })}
+      {/* Welcome */}
+      <div className={`flex flex-col ${isMobile ? 'gap-3' : 'flex-row items-center justify-between'}`}>
+        <div>
+          <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-extrabold tracking-tight`}>
+            Welcome back{user?.first_name ? `, ${user.first_name}` : ''}
+          </h1>
+          <p className="text-xs md:text-sm text-slate-500 mt-1">Quality management overview · {new Date().toLocaleDateString('en-US', { weekday: isMobile ? 'short' : 'long', year: 'numeric', month: 'short', day: 'numeric' })}</p>
         </div>
+        <button onClick={() => navigate('/documents')} className="btn-primary flex items-center justify-center gap-2 w-full md:w-auto">
+          <Plus size={isMobile ? 16 : 15} /> New Document
+        </button>
+      </div>
 
-        {/* Quality Trend Chart */}
-        <div className="bg-eqms-card rounded-lg p-6 border border-eqms-border mb-8">
-          <div className="flex items-center gap-2 mb-6">
-            <BarChart3 className="w-5 h-5 text-eqms-accent" />
-            <h2 className="text-lg font-semibold text-eqms-text">Quality Trend</h2>
+      {/* KPI Cards */}
+      <div className={`grid gap-3 md:gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5'}`}>
+        {kpiCards.slice(0, isMobile ? 4 : 5).map((kpi, i) => (
+          <div key={i} className="card p-3 md:p-4 relative overflow-hidden border-l-2" style={{ borderLeftColor: `var(--tw-${kpi.color})` }}>
+            <div className={`absolute -top-4 -right-4 w-16 h-16 rounded-full ${kpi.glow} blur-xl`} />
+            <div className="flex items-center justify-between mb-2 relative">
+              <span className="text-xs font-medium text-slate-500 truncate">{kpi.label}</span>
+              <kpi.icon size={isMobile ? 14 : 16} className={kpi.color} />
+            </div>
+            <div className={`${isMobile ? 'text-xl' : 'text-2xl'} font-extrabold relative`}>{kpi.value}</div>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={qualityTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
-              <XAxis dataKey="month" stroke="#8b8b9a" />
-              <YAxis stroke="#8b8b9a" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1a1a2e',
-                  border: '1px solid #2a2a3e',
-                  borderRadius: '8px',
-                  color: '#f0f0f0',
-                }}
-              />
-              <Legend wrapperStyle={{ color: '#8b8b9a' }} />
-              <Line type="monotone" dataKey="qualityScore" stroke="#3b82f6" name="Quality Score %" />
-              <Line type="monotone" dataKey="capas" stroke="#ef4444" name="CAPAs" />
-              <Line type="monotone" dataKey="deviations" stroke="#eab308" name="Deviations" />
+        ))}
+      </div>
+
+      <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'}`}>
+        {/* CAPA Trends Chart */}
+        <div className={`${isMobile ? '' : 'lg:col-span-2'} card p-4 md:p-5`}>
+          <h3 className="text-sm md:text-base font-bold mb-4">CAPA Trends (6 Months)</h3>
+          <ResponsiveContainer width="100%" height={isMobile ? 250 : 280}>
+            <LineChart data={capaTrends.length ? capaTrends : [
+              { month: 'Oct', opened: 4, closed: 3 },
+              { month: 'Nov', opened: 3, closed: 5 },
+              { month: 'Dec', opened: 5, closed: 4 },
+              { month: 'Jan', opened: 2, closed: 3 },
+              { month: 'Feb', opened: 6, closed: 4 },
+              { month: 'Mar', opened: 3, closed: 2 },
+            ]}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1F2A40" />
+              <XAxis dataKey="month" stroke="#64748b" fontSize={isMobile ? 10 : 11} />
+              <YAxis stroke="#64748b" fontSize={isMobile ? 10 : 11} />
+              <Tooltip contentStyle={{ backgroundColor: '#141B2D', border: '1px solid #1F2A40', borderRadius: 8, fontSize: 12 }} />
+              <Line type="monotone" dataKey="opened" stroke="#f59e0b" strokeWidth={2} dot={isMobile ? false : { r: 3 }} />
+              <Line type="monotone" dataKey="closed" stroke="#10b981" strokeWidth={2} dot={isMobile ? false : { r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          {/* Activity Feed */}
-          <div className="lg:col-span-2 bg-eqms-card rounded-lg p-6 border border-eqms-border">
-            <div className="flex items-center gap-2 mb-6">
-              <Activity className="w-5 h-5 text-eqms-accent" />
-              <h2 className="text-lg font-semibold text-eqms-text">Recent Activity</h2>
-            </div>
-            <div className="space-y-4">
-              {recentActivity.map((item) => (
-                <div key={item.id} className="flex items-start gap-4 pb-4 border-b border-eqms-border last:border-0">
-                  <div className="w-10 h-10 rounded-full bg-eqms-dark flex items-center justify-center flex-shrink-0">
-                    {item.status === 'success' && <CheckCircle className="w-5 h-5 text-green-400" />}
-                    {item.status === 'warning' && <AlertCircle className="w-5 h-5 text-yellow-400" />}
-                    {item.status === 'error' && <AlertCircle className="w-5 h-5 text-red-400" />}
-                    {item.status === 'info' && <Clock className="w-5 h-5 text-blue-400" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-eqms-text font-medium">{item.action}</p>
-                    <p className="text-eqms-text-secondary text-sm">{item.item}</p>
-                    <p className="text-eqms-text-secondary text-xs mt-1">
-                      {item.user} • {item.time}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Upcoming Deadlines */}
-          <div className="bg-eqms-card rounded-lg p-6 border border-eqms-border">
-            <div className="flex items-center gap-2 mb-6">
-              <Calendar className="w-5 h-5 text-eqms-accent" />
-              <h2 className="text-lg font-semibold text-eqms-text">Deadlines</h2>
-            </div>
-            <div className="space-y-3">
-              {upcomingDeadlines.map((deadline) => (
-                <div key={deadline.id} className="p-3 bg-eqms-dark rounded border border-eqms-border">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-eqms-text text-sm font-medium">{deadline.item}</p>
-                    <span
-                      className={`text-xs font-semibold px-2 py-1 rounded ${
-                        deadline.priority === 'high'
-                          ? 'bg-red-500/20 text-red-400'
-                          : deadline.priority === 'medium'
-                            ? 'bg-yellow-500/20 text-yellow-400'
-                            : 'bg-green-500/20 text-green-400'
-                      }`}
-                    >
-                      {deadline.days} days
-                    </span>
-                  </div>
-                  <p className="text-eqms-text-secondary text-xs">{deadline.dueDate}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Module Status Grid */}
-        <div className="bg-eqms-card rounded-lg p-6 border border-eqms-border">
-          <div className="flex items-center gap-2 mb-6">
-            <Target className="w-5 h-5 text-eqms-accent" />
-            <h2 className="text-lg font-semibold text-eqms-text">Module Status</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {modules.map((module, idx) => (
-              <div
-                key={idx}
-                className="p-4 bg-eqms-dark rounded-lg border border-eqms-border cursor-pointer hover:border-eqms-accent transition-colors"
-                onClick={() => setSelectedModule(selectedModule === idx ? null : idx)}
+        {/* CAPA Status Pie */}
+        <div className="card p-4 md:p-5">
+          <h3 className="text-sm md:text-base font-bold mb-4">CAPA Status Distribution</h3>
+          <ResponsiveContainer width="100%" height={isMobile ? 250 : 280}>
+            <PieChart>
+              <Pie
+                data={capaStatusData.length ? capaStatusData : [
+                  { name: 'Open', value: 8, fill: '#f59e0b' },
+                  { name: 'Investigation', value: 3, fill: '#3b82f6' },
+                  { name: 'Closed', value: 12, fill: '#10b981' },
+                ]}
+                cx="50%"
+                cy="50%"
+                innerRadius={isMobile ? 40 : 50}
+                outerRadius={isMobile ? 60 : 80}
+                paddingAngle={3}
+                dataKey="value"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-eqms-text font-medium">{module.name}</h3>
-                  <span className="text-eqms-text-secondary text-xs">{module.docs} docs</span>
-                </div>
-                <div className="w-full bg-eqms-border rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all"
-                    style={{ width: `${module.progress}%` }}
-                  ></div>
-                </div>
-                <p className="text-eqms-text-secondary text-xs mt-2">{module.progress}% complete</p>
+                {(capaStatusData.length ? capaStatusData : []).map((entry, index) => (
+                  <Cell key={index} fill={entry.fill} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ backgroundColor: '#141B2D', border: '1px solid #1F2A40', borderRadius: 8, fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="card overflow-hidden">
+        <div className={`px-4 md:px-5 py-3 border-b border-eqms-border`}>
+          <h3 className="text-sm md:text-base font-bold">Recent Activity</h3>
+        </div>
+        <div className="divide-y divide-eqms-border">
+          {(recentActivity.length ? recentActivity : [
+            { type: 'CAPA', description: 'CAPA-2025-001 moved to Verification', timestamp: '2 hours ago' },
+            { type: 'Document', description: 'SOP-QA-001 Rev 3 Approved', timestamp: '4 hours ago' },
+            { type: 'Training', description: 'ISO 13485 Training Completed', timestamp: '1 day ago' },
+            { type: 'Audit', description: 'Internal Audit Q1 Scheduled', timestamp: '2 days ago' },
+            { type: 'Deviation', description: 'DEV-2025-003 Closed', timestamp: '3 days ago' },
+          ]).slice(0, isMobile ? 5 : 8).map((item, i) => (
+            <div key={i} className={`flex items-center gap-2 md:gap-3 px-4 md:px-5 py-2 md:py-3 hover:bg-eqms-input transition-colors`}>
+              <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                <ArrowUpRight size={isMobile ? 10 : 12} className="text-blue-400" />
               </div>
-            ))}
-          </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs md:text-sm text-slate-300 truncate">{item.description || item.title || `${item.type} activity`}</p>
+                <p className="text-xs text-slate-500">{item.type}</p>
+              </div>
+              {!isMobile && <span className="text-xs text-slate-500 whitespace-nowrap">{item.timestamp || item.time || ''}</span>}
+            </div>
+          ))}
         </div>
       </div>
     </div>
-  );
+  )
 }

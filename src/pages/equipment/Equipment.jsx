@@ -1,170 +1,244 @@
-import React, { useState } from 'react';
-import { equipment } from '@/data/mockData';
-import StatusBadge from '@/components/common/StatusBadge';
-import { Plus, Calendar, Zap, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react'
+import { Plus, Search, Eye, Wrench, AlertCircle, CheckCircle, Clock } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import { equipmentAPI } from '../../api'
+import { equipmentCreateSchema } from '../../validation/schemas'
+import StatusBadge from '../../components/common/StatusBadge'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+import EmptyState from '../../components/common/EmptyState'
+import Pagination from '../../components/common/Pagination'
+import Modal from '../../components/common/Modal'
+import FormField from '../../components/common/FormField'
 
 export default function Equipment() {
-  const [equipmentList] = useState(equipment);
+  const [items, setItems] = useState([])
+  const [dashboard, setDashboard] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [showCreate, setShowCreate] = useState(false)
+  const [selectedItem, setSelectedItem] = useState(null)
 
-  const stats = [
-    {
-      label: 'Total Equipment',
-      value: equipmentList.length,
-      icon: Zap,
-      color: 'text-blue-400'
-    },
-    {
-      label: 'Active',
-      value: equipmentList.filter(e => e.status === 'active').length,
-      icon: CheckCircle2,
-      color: 'text-green-400'
-    },
-    {
-      label: 'Due Calibration',
-      value: equipmentList.filter(e => e.calibrationStatus === 'due_soon').length,
-      icon: Calendar,
-      color: 'text-yellow-400'
-    },
-    {
-      label: 'Overdue',
-      value: equipmentList.filter(e => e.calibrationStatus === 'overdue').length,
-      icon: AlertCircle,
-      color: 'text-red-400'
+  useEffect(() => { fetchData() }, [page, search])
+
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [eqRes, dashRes] = await Promise.allSettled([
+        equipmentAPI.equipment?.list({ page, ...(search && { search }) }),
+        equipmentAPI.dashboard?.(),
+      ])
+      if (eqRes.status === 'fulfilled') {
+        setItems(eqRes.value.data?.results || eqRes.value.data || [])
+        setTotalCount(eqRes.value.data?.count || 0)
+      } else if (eqRes.status === 'rejected') {
+        console.error('Failed to load equipment:', eqRes.reason)
+      }
+      if (dashRes.status === 'fulfilled' && dashRes.value) {
+        setDashboard(dashRes.value.data)
+      }
+    } catch (err) {
+      console.error('Failed to load equipment:', err)
+      setError(err.message || 'Failed to load equipment data')
+    } finally {
+      setLoading(false)
     }
-  ];
+  }
 
-  const getCalibrationColor = (status) => {
-    switch (status) {
-      case 'current':
-        return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'due_soon':
-        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'overdue':
-        return 'bg-red-500/20 text-red-400 border-red-500/30';
-      default:
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+  const handleCreate = async (formData) => {
+    try {
+      await equipmentAPI.equipment?.create(formData)
+      setShowCreate(false)
+      fetchData()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to create equipment')
     }
-  };
-
-  const getCalibrationLabel = (status) => {
-    switch (status) {
-      case 'current':
-        return 'Current';
-      case 'due_soon':
-        return 'Due Soon';
-      case 'overdue':
-        return 'Overdue';
-      default:
-        return 'Unknown';
-    }
-  };
-
-  const upcomingCalibrations = equipmentList
-    .filter(e => e.nextCalibrationDate)
-    .sort((a, b) => new Date(a.nextCalibrationDate) - new Date(b.nextCalibrationDate))
-    .slice(0, 5);
+  }
 
   return (
-    <div className="min-h-screen bg-eqms-dark p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-eqms-text mb-2">Equipment & Calibration</h1>
-            <p className="text-eqms-text-secondary">Manage equipment inventory and calibration schedules</p>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Equipment & Calibration</h1>
+        <p className="text-slate-400">Equipment management, calibration tracking, environmental monitoring</p>
+      </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex justify-between items-center">
+          <span>{error}</span>
+          <button onClick={fetchData} className="text-red-300 hover:text-red-200 underline ml-4">Retry</button>
+        </div>
+      )}
+
+      {/* Dashboard KPIs */}
+      {dashboard && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Wrench size={16} className="text-blue-400" />
+              <span className="text-xs text-slate-500">Total Equipment</span>
+            </div>
+            <p className="text-2xl font-bold">{dashboard.total_equipment ?? '—'}</p>
           </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
-            <Plus size={20} />
-            Add Equipment
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle size={16} className="text-green-400" />
+              <span className="text-xs text-slate-500">Active</span>
+            </div>
+            <p className="text-2xl font-bold">{dashboard.active ?? '—'}</p>
+          </div>
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock size={16} className="text-yellow-400" />
+              <span className="text-xs text-slate-500">Due Calibration</span>
+            </div>
+            <p className="text-2xl font-bold">{dashboard.calibration_due ?? '—'}</p>
+          </div>
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle size={16} className="text-red-400" />
+              <span className="text-xs text-slate-500">Overdue</span>
+            </div>
+            <p className="text-2xl font-bold">{dashboard.calibration_overdue ?? '—'}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="card p-6 mb-6">
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <div className="flex-1 relative min-w-[250px]">
+            <Search className="absolute left-3 top-2.5 text-slate-500" size={20} />
+            <input
+              type="text"
+              placeholder="Search equipment..."
+              className="input-field pl-10"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
+          </div>
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> Add Equipment
           </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <div key={index} className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-eqms-text-secondary text-sm mb-2">{stat.label}</p>
-                    <p className="text-3xl font-bold text-eqms-text">{stat.value}</p>
-                  </div>
-                  <Icon className={`${stat.color}`} size={24} />
-                </div>
+        {loading ? (
+          <LoadingSpinner />
+        ) : !items.length ? (
+          <EmptyState icon={Wrench} title="No equipment found" message="Add your first piece of equipment" />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-eqms-border">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Equipment ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Name</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Type</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Location</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Next Calibration</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((eq) => (
+                    <tr key={eq.id} className="border-b border-eqms-border hover:bg-slate-800/50 transition">
+                      <td className="py-3 px-4 font-mono text-blue-400">{eq.equipment_id || eq.id}</td>
+                      <td className="py-3 px-4 font-medium">{eq.name}</td>
+                      <td className="py-3 px-4 text-slate-400">{eq.equipment_type || '—'}</td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={eq.status} />
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">{eq.location || '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{eq.next_calibration_date || '—'}</td>
+                      <td className="py-3 px-4">
+                        <button 
+                          onClick={() => setSelectedItem(eq)}
+                          className="p-2 rounded hover:bg-slate-700 transition"
+                        >
+                          <Eye size={16} className="text-slate-400" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalCount={totalCount} onPageChange={setPage} />
+          </>
+        )}
+      </div>
+
+      {/* Create Modal */}
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Add Equipment" size="lg">
+        <CreateEquipmentForm onSubmit={handleCreate} onCancel={() => setShowCreate(false)} />
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} title={selectedItem?.name || 'Equipment Detail'} size="lg">
+        {selectedItem && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-xs text-slate-500">Equipment ID</span>
+              <p className="font-mono text-blue-400">{selectedItem.equipment_id || selectedItem.id}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Status</span>
+              <p><StatusBadge status={selectedItem.status} /></p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Type</span>
+              <p className="text-sm">{selectedItem.equipment_type || '—'}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Location</span>
+              <p className="text-sm">{selectedItem.location || '—'}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Next Calibration</span>
+              <p className="text-sm">{selectedItem.next_calibration_date || '—'}</p>
+            </div>
+            {selectedItem.description && (
+              <div className="col-span-2">
+                <span className="text-xs text-slate-500">Description</span>
+                <p className="text-sm text-slate-300 mt-1">{selectedItem.description}</p>
               </div>
-            );
-          })}
-        </div>
-
-        {/* Equipment Grid */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-eqms-text mb-4">Equipment Inventory</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {equipmentList.map((item) => (
-              <div key={item.id} className="bg-eqms-card border border-eqms-border rounded-lg p-6 hover:border-eqms-accent transition-colors">
-                {/* Header */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-eqms-text">{item.name}</h3>
-                    <p className="text-sm text-eqms-text-secondary">{item.type}</p>
-                  </div>
-                  <StatusBadge status={item.status} />
-                </div>
-
-                {/* Details */}
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-eqms-text-secondary text-sm">Location</span>
-                    <span className="text-eqms-text font-medium">{item.location}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-eqms-text-secondary text-sm">Calibration</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getCalibrationColor(item.calibrationStatus)}`}>
-                      {getCalibrationLabel(item.calibrationStatus)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Dates */}
-                <div className="border-t border-eqms-border pt-4 space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-eqms-text-secondary">Last Calibration</span>
-                    <span className="text-eqms-text">{new Date(item.lastCalibrationDate).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-eqms-text-secondary">Next Due</span>
-                    <span className="text-eqms-text font-medium">{new Date(item.nextCalibrationDate).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Calibration Timeline */}
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-eqms-text mb-4">Upcoming Calibrations</h2>
-          <div className="space-y-3">
-            {upcomingCalibrations.length > 0 ? (
-              upcomingCalibrations.map((item) => (
-                <div key={item.id} className="flex items-center gap-4 p-3 bg-eqms-dark rounded-lg border border-eqms-border/50">
-                  <Calendar size={20} className="text-blue-400 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-eqms-text font-medium">{item.name}</p>
-                    <p className="text-sm text-eqms-text-secondary">{item.location}</p>
-                  </div>
-                  <span className="text-sm font-medium text-eqms-text whitespace-nowrap">
-                    {new Date(item.nextCalibrationDate).toLocaleDateString()}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="text-eqms-text-secondary text-center py-8">No upcoming calibrations</p>
             )}
           </div>
-        </div>
-      </div>
+        )}
+      </Modal>
     </div>
-  );
+  )
+}
+
+function CreateEquipmentForm({ onSubmit, onCancel }) {
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: yupResolver(equipmentCreateSchema),
+    defaultValues: { name: '', equipment_type: '', serial_number: '', location: '' },
+    mode: 'onBlur',
+  })
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <FormField label="Equipment Name" error={errors.name?.message} required>
+        <input {...register('name')} className={`input-field ${errors.name ? 'border-red-500/50' : ''}`} placeholder="Enter equipment name" />
+      </FormField>
+      <FormField label="Equipment Type" error={errors.equipment_type?.message} required>
+        <input {...register('equipment_type')} className={`input-field ${errors.equipment_type ? 'border-red-500/50' : ''}`} placeholder="Enter equipment type" />
+      </FormField>
+      <FormField label="Serial Number" error={errors.serial_number?.message} required>
+        <input {...register('serial_number')} className={`input-field ${errors.serial_number ? 'border-red-500/50' : ''}`} placeholder="Enter serial number" />
+      </FormField>
+      <FormField label="Location" error={errors.location?.message} required>
+        <input {...register('location')} className={`input-field ${errors.location ? 'border-red-500/50' : ''}`} placeholder="Enter equipment location" />
+      </FormField>
+      <div className="flex justify-end gap-2 pt-4 border-t border-eqms-border">
+        <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
+        <button type="submit" className="btn-primary">Add Equipment</button>
+      </div>
+    </form>
+  )
 }

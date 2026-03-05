@@ -1,27 +1,39 @@
-import { Bell, Search, HelpCircle } from 'lucide-react';
+import React, { useContext } from 'react'
+import { Menu, Bell, User, Settings } from 'lucide-react'
+import { AuthContext } from '../../contexts/AuthContext'
 
-export default function Header() {
+export default function Header({ onMenuClick }) {
+  const { user } = useContext(AuthContext)
+
   return (
-    <header className="h-14 bg-eqms-darker/80 backdrop-blur-sm border-b border-eqms-border flex items-center justify-between px-6 fixed top-0 left-64 right-0 z-20">
-      <div className="flex items-center gap-3 flex-1">
-        <div className="relative max-w-md w-full">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-eqms-text-muted" />
-          <input
-            type="text"
-            placeholder="Search documents, CAPAs, deviations..."
-            className="w-full bg-eqms-card border border-eqms-border rounded-lg pl-9 pr-4 py-2 text-sm text-eqms-text placeholder:text-eqms-text-muted focus:outline-none focus:border-eqms-accent/50 focus:ring-1 focus:ring-eqms-accent/20"
-          />
+    <header className="bg-eqms-card border-b border-eqms-border px-6 py-4 flex items-center justify-between">
+      <button
+        onClick={onMenuClick}
+        className="lg:hidden text-slate-400 hover:text-slate-200"
+      >
+        <Menu size={24} />
+      </button>
+
+      <div className="flex-1" />
+
+      <div className="flex items-center gap-4">
+        <button className="text-slate-400 hover:text-slate-200 transition-colors">
+          <Bell size={20} />
+        </button>
+        
+        <button className="text-slate-400 hover:text-slate-200 transition-colors">
+          <Settings size={20} />
+        </button>
+
+        <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-sm font-semibold">
+          {user?.email?.[0]?.toUpperCase() || 'U'}
+        </div>
+
+        <div className="text-sm">
+          <p className="font-medium text-slate-100">{user?.name || user?.email}</p>
+          <p className="text-xs text-slate-500">Admin</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button className="relative p-2 rounded-lg hover:bg-eqms-card text-eqms-text-dim hover:text-eqms-text transition-colors">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-eqms-danger rounded-full" />
-        </button>
-        <button className="p-2 rounded-lg hover:bg-eqms-card text-eqms-text-dim hover:text-eqms-text transition-colors">
-          <HelpCircle className="w-5 h-5" />
-        </button>
-      </div>
     </header>
-  );
+  )
 }
