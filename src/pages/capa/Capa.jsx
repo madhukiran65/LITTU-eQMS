@@ -1,236 +1,277 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Plus, AlertCircle, TrendingUp } from 'lucide-react';
-import { capas } from '@/data/mockData';
-import StatusBadge from '@/components/common/StatusBadge';
+import React, { useState, useEffect } from 'react'
+import { Plus, Search, Filter, Eye, Edit3, ChevronRight, Target } from 'lucide-react'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import { capaCreateSchema } from '../../validation/schemas'
+import { capaAPI } from '../../api'
+import StatusBadge from '../../components/common/StatusBadge'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+import EmptyState from '../../components/common/EmptyState'
+import Pagination from '../../components/common/Pagination'
+import Modal from '../../components/common/Modal'
+import FormField from '../../components/common/FormField'
+import RichTextEditor from '../../components/common/RichTextEditor'
+import RichTextViewer from '../../components/common/RichTextViewer'
 
-const Capa = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [phaseFilter, setPhaseFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+export default function Capa() {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
 
-  const phases = [
-    'initiation',
-    'containment',
-    'root_cause_analysis',
-    'corrective_action',
-    'preventive_action',
-    'effectiveness_check',
-    'closure',
-  ];
+  useEffect(() => { fetchItems() }, [page, search, statusFilter])
 
-  const priorities = ['Critical', 'High', 'Medium', 'Low'];
+  const fetchItems = async () => {
+    setLoading(true)
+    try {
+      const params = { page, ...(search && { search }), ...(statusFilter && { status: statusFilter }) }
+      const { data } = await capaAPI.list(params)
+      setItems(data.results || data || [])
+      setTotalCount(data.count || 0)
+    } catch (err) {
+      console.error('Failed to load CAPA records:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const filteredCAPAs = useMemo(() => {
-    return capas.filter((capa) => {
-      const matchesSearch =
-        (capa.capa_id || String(capa.id)).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        capa.title.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesPhase = phaseFilter === 'all' || capa.phase === phaseFilter;
-      const matchesPriority = priorityFilter === 'all' || capa.priority.toLowerCase() === priorityFilter.toLowerCase();
-      return matchesSearch && matchesPhase && matchesPriority;
-    });
-  }, [searchTerm, phaseFilter, priorityFilter]);
-
-  const stats = {
-    totalOpen: capas.filter((c) => c.phase !== 'closure').length,
-    inInvestigation: capas.filter((c) => c.phase === 'root_cause_analysis').length,
-    overdue: capas.filter((c) => new Date(c.dueDate) < new Date()).length,
-    avgDaysToClose: Math.round(
-      capas.reduce((sum, c) => sum + (c.daysToClose || 0), 0) / capas.length
-    ),
-  };
-
-  const isOverdue = (dueDate) => new Date(dueDate) < new Date();
+  const handleCreate = async (formData) => {
+    setCreating(true)
+    try {
+      await capaAPI.create(formData)
+      setShowCreate(false)
+      fetchItems()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to create CAPA')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-eqms-dark p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-eqms-text mb-2">CAPA Management</h1>
-          <p className="text-eqms-text-secondary">Manage corrective and preventive actions</p>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">CAPA (Corrective & Preventive Actions)</h1>
+        <p className="text-slate-400">Manage corrective and preventive action records with 9-stage lifecycle</p>
+      </div>
+
+      <div className="card p-6 mb-6">
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <div className="flex-1 relative min-w-[250px]">
+            <Search className="absolute left-3 top-2.5 text-slate-500" size={20} />
+            <input
+              type="text"
+              placeholder="Search CAPA records..."
+              className="input-field pl-10"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
+          </div>
+          <select 
+            value={statusFilter} 
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} 
+            className="input-field w-auto"
+          >
+            <option value="">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="investigation">Investigation</option>
+            <option value="root_cause">Root Cause</option>
+            <option value="action_plan">Action Plan</option>
+            <option value="implementation">Implementation</option>
+            <option value="verification">Verification</option>
+            <option value="closure">Closure</option>
+            <option value="closed">Closed</option>
+          </select>
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> New CAPA
+          </button>
         </div>
 
-        {/* Phase Lifecycle Visual */}
-        <div className="mb-8 bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <h3 className="text-sm font-semibold text-eqms-text mb-4">CAPA Lifecycle</h3>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
-            {phases.map((phase, index) => (
-              <React.Fragment key={phase}>
-                <div className="flex flex-col items-center min-w-max">
-                  <div className="w-8 h-8 rounded-full bg-eqms-accent flex items-center justify-center text-xs font-bold text-eqms-dark">
-                    {index + 1}
-                  </div>
-                  <span className="text-xs text-eqms-text-secondary mt-2 max-w-[80px] text-center">
-                    {phase.replace(/_/g, ' ')}
-                  </span>
-                </div>
-                {index < phases.length - 1 && (
-                  <div className="h-0.5 bg-eqms-border flex-1 mb-4 min-w-[20px]" />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2">Total Open</p>
-            <p className="text-3xl font-bold text-eqms-text">{stats.totalOpen}</p>
-          </div>
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2">In Investigation</p>
-            <p className="text-3xl font-bold text-eqms-text">{stats.inInvestigation}</p>
-          </div>
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2 flex items-center gap-2">
-              <AlertCircle size={16} className="text-red-500" />
-              Overdue
-            </p>
-            <p className="text-3xl font-bold text-red-500">{stats.overdue}</p>
-          </div>
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2 flex items-center gap-2">
-              <TrendingUp size={16} className="text-eqms-accent" />
-              Avg Days to Close
-            </p>
-            <p className="text-3xl font-bold text-eqms-text">{stats.avgDaysToClose}</p>
-          </div>
-        </div>
-
-        {/* Filter Bar */}
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-4 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search
-                size={18}
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-eqms-text-secondary"
-              />
-              <input
-                type="text"
-                placeholder="Search CAPA ID or title..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-eqms-dark border border-eqms-border rounded text-eqms-text placeholder-eqms-text-secondary focus:outline-none focus:border-eqms-accent"
-              />
-            </div>
-            <select
-              value={phaseFilter}
-              onChange={(e) => setPhaseFilter(e.target.value)}
-              className="px-4 py-2 bg-eqms-dark border border-eqms-border rounded text-eqms-text focus:outline-none focus:border-eqms-accent"
-            >
-              <option value="all">All Phases</option>
-              {phases.map((phase) => (
-                <option key={phase} value={phase}>
-                  {phase.replace(/_/g, ' ')}
-                </option>
-              ))}
-            </select>
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="px-4 py-2 bg-eqms-dark border border-eqms-border rounded text-eqms-text focus:outline-none focus:border-eqms-accent"
-            >
-              <option value="all">All Priorities</option>
-              {priorities.map((priority) => (
-                <option key={priority} value={priority}>
-                  {priority}
-                </option>
-              ))}
-            </select>
-            <button className="px-4 py-2 bg-eqms-accent text-eqms-dark font-semibold rounded hover:bg-opacity-90 transition flex items-center justify-center gap-2">
-              <Plus size={18} />
-              New CAPA
-            </button>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-eqms-card border border-eqms-border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-eqms-border bg-eqms-dark/50">
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    CAPA ID
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Title
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Phase
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Priority
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Source
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Assignee
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Due Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCAPAs.map((capa) => (
-                  <tr
-                    key={capa.id}
-                    className={`border-b border-eqms-border hover:bg-eqms-dark/50 transition ${
-                      isOverdue(capa.dueDate) ? 'border-l-4 border-l-red-500' : ''
-                    }`}
-                  >
-                    <td className="px-6 py-4 text-sm font-medium text-eqms-accent">
-                      {capa.capa_id || capa.id}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-eqms-text">{capa.title}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <StatusBadge
-                        status={capa.phase}
-                        label={capa.phase.replace(/_/g, ' ')}
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <StatusBadge
-                        status={capa.priority.toLowerCase()}
-                        label={capa.priority}
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-sm text-eqms-text-secondary">
-                      {capa.source}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-eqms-text">{capa.assignee}</td>
-                    <td
-                      className={`px-6 py-4 text-sm ${
-                        isOverdue(capa.dueDate)
-                          ? 'text-red-500 font-medium'
-                          : 'text-eqms-text-secondary'
-                      }`}
-                    >
-                      {new Date(capa.dueDate).toLocaleDateString()}
-                    </td>
+        {loading ? (
+          <LoadingSpinner />
+        ) : !items.length ? (
+          <EmptyState icon={Target} title="No CAPA records found" message="Create your first CAPA record" />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-eqms-border">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">CAPA ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Title</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Stage</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Priority</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Assigned To</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Due Date</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-b border-eqms-border hover:bg-slate-800/50 transition">
+                      <td className="py-3 px-4 font-mono text-blue-400">{item.capa_id || item.id}</td>
+                      <td className="py-3 px-4 font-medium">{item.title}</td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={item.status || item.stage} />
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">{item.priority || '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{item.assigned_to_name || '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{item.due_date || '—'}</td>
+                      <td className="py-3 px-4">
+                        <button 
+                          onClick={() => setSelectedItem(item)}
+                          className="p-2 rounded hover:bg-slate-700 transition"
+                        >
+                          <Eye size={16} className="text-slate-400" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalCount={totalCount} onPageChange={setPage} />
+          </>
+        )}
+      </div>
+
+      {/* Create Modal */}
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Create New CAPA" size="lg">
+        <CreateCapaForm onSubmit={handleCreate} loading={creating} onCancel={() => setShowCreate(false)} />
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} title={selectedItem?.title || 'CAPA Detail'} size="lg">
+        {selectedItem && <CapaDetail capa={selectedItem} onClose={() => setSelectedItem(null)} onRefresh={fetchItems} />}
+      </Modal>
+    </div>
+  )
+}
+
+function CreateCapaForm({ onSubmit, loading, onCancel }) {
+  const { register, handleSubmit, control, formState: { errors } } = useForm({
+    resolver: yupResolver(capaCreateSchema),
+    defaultValues: { title: '', description: '', priority: 'medium', source: '' },
+    mode: 'onBlur',
+  })
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <FormField label="Title" error={errors.title?.message} required>
+        <input {...register('title')} className={`input-field ${errors.title ? 'border-red-500/50' : ''}`} placeholder="Enter CAPA title (min 5 characters)" />
+      </FormField>
+
+      <FormField label="Priority" error={errors.priority?.message} required>
+        <select {...register('priority')} className="input-field">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+      </FormField>
+
+      <FormField label="Source" error={errors.source?.message}>
+        <select {...register('source')} className="input-field">
+          <option value="">Select source...</option>
+          <option value="audit">Audit Finding</option>
+          <option value="complaint">Customer Complaint</option>
+          <option value="deviation">Deviation</option>
+          <option value="inspection">Regulatory Inspection</option>
+          <option value="management_review">Management Review</option>
+          <option value="other">Other</option>
+        </select>
+      </FormField>
+
+      <FormField label="Description" error={errors.description?.message} required helpText="Minimum 20 characters — use rich text for detailed descriptions">
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <RichTextEditor
+              value={field.value}
+              onChange={field.onChange}
+              placeholder="Describe the corrective/preventive action needed..."
+              minHeight="180px"
+              error={!!errors.description}
+            />
+          )}
+        />
+      </FormField>
+
+      <div className="flex justify-end gap-2 pt-4 border-t border-eqms-border">
+        <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
+        <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Creating...' : 'Create CAPA'}</button>
+      </div>
+    </form>
+  )
+}
+
+function CapaDetail({ capa, onClose, onRefresh }) {
+  const [auditTrail, setAuditTrail] = useState([])
+  const [tab, setTab] = useState('details')
+
+  useEffect(() => {
+    if (capa.id && capaAPI.auditTrail) {
+      capaAPI.auditTrail(capa.id).then(r => setAuditTrail(r.data || [])).catch(() => {})
+    }
+  }, [capa.id])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 border-b border-eqms-border pb-2">
+        {['details', 'audit_trail'].map(t => (
+          <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm rounded ${tab === t ? 'bg-blue-500/10 text-blue-400 font-medium' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t === 'details' ? 'Details' : 'Audit Trail'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'details' && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <span className="text-xs text-slate-500">CAPA ID</span>
+            <p className="font-mono text-blue-400">{capa.capa_id || capa.id}</p>
           </div>
-          {filteredCAPAs.length === 0 && (
-            <div className="px-6 py-12 text-center">
-              <p className="text-eqms-text-secondary">No CAPAs found matching your criteria</p>
+          <div>
+            <span className="text-xs text-slate-500">Stage</span>
+            <p><StatusBadge status={capa.status || capa.stage} /></p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Priority</span>
+            <p className="text-sm">{capa.priority || '—'}</p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Due Date</span>
+            <p className="text-sm">{capa.due_date || '—'}</p>
+          </div>
+          {capa.description && (
+            <div className="col-span-2">
+              <span className="text-xs text-slate-500">Description</span>
+              <RichTextViewer content={capa.description} className="mt-1" />
             </div>
           )}
         </div>
+      )}
 
-        {/* Results Count */}
-        <div className="mt-4 text-sm text-eqms-text-secondary">
-          Showing {filteredCAPAs.length} of {capas.length} CAPAs
+      {tab === 'audit_trail' && (
+        <div className="space-y-2">
+          {auditTrail.length ? auditTrail.map((entry, i) => (
+            <div key={i} className="p-3 bg-slate-800 rounded text-sm border border-slate-700">
+              <div className="flex justify-between mb-1">
+                <span className="font-medium">{entry.action}</span>
+                <span className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleString()}</span>
+              </div>
+              <p className="text-slate-400 text-xs">{entry.user} — {entry.details}</p>
+            </div>
+          )) : <p className="text-sm text-slate-500">No audit trail entries</p>}
         </div>
-      </div>
+      )}
     </div>
-  );
-};
+  )
+}
 
-export default Capa;

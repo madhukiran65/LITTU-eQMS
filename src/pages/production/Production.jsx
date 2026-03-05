@@ -1,149 +1,230 @@
-import React, { useState } from 'react';
-import { batchRecords } from '@/data/mockData';
-import StatusBadge from '@/components/common/StatusBadge';
-import { Plus, BarChart3, CheckCircle2, TrendingUp, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react'
+import { Plus, Search, Eye, Package, Activity, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import { productionAPI } from '../../api'
+import { batchRecordSchema } from '../../validation/schemas'
+import StatusBadge from '../../components/common/StatusBadge'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+import EmptyState from '../../components/common/EmptyState'
+import Pagination from '../../components/common/Pagination'
+import Modal from '../../components/common/Modal'
+import FormField from '../../components/common/FormField'
 
 export default function Production() {
-  const [batches] = useState(batchRecords);
+  const [batches, setBatches] = useState([])
+  const [dashboard, setDashboard] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [selected, setSelected] = useState(null)
+  const [showCreate, setShowCreate] = useState(false)
 
-  const stats = [
-    {
-      label: 'Batches In Progress',
-      value: batches.filter(b => b.status === 'in_progress').length,
-      icon: Clock,
-      color: 'text-blue-400'
-    },
-    {
-      label: 'Completed This Month',
-      value: batches.filter(b => b.status === 'completed').length,
-      icon: CheckCircle2,
-      color: 'text-green-400'
-    },
-    {
-      label: 'Avg Yield',
-      value: (batches.reduce((sum, b) => sum + b.yield, 0) / batches.length).toFixed(1) + '%',
-      icon: TrendingUp,
-      color: 'text-yellow-400'
-    },
-    {
-      label: 'Under Review',
-      value: batches.filter(b => b.status === 'under_review').length,
-      icon: BarChart3,
-      color: 'text-purple-400'
+  useEffect(() => { fetchData() }, [page, search])
+
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const [batchRes, dashRes] = await Promise.allSettled([
+        productionAPI.batches?.list({ page, ...(search && { search }) }),
+        productionAPI.dashboard?.(),
+      ])
+      if (batchRes.status === 'fulfilled') {
+        setBatches(batchRes.value.data?.results || batchRes.value.data || [])
+        setTotalCount(batchRes.value.data?.count || 0)
+      }
+      if (dashRes.status === 'fulfilled' && dashRes.value) {
+        setDashboard(dashRes.value.data)
+      }
+    } catch (err) { 
+      console.error('Failed to load production:', err) 
+    } finally { 
+      setLoading(false) 
     }
-  ];
+  }
 
-  const getYieldColor = (yield_) => {
-    if (yield_ >= 95) return 'bg-green-500';
-    if (yield_ >= 90) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
-
-  const getYieldTextColor = (yield_) => {
-    if (yield_ >= 95) return 'text-green-400';
-    if (yield_ >= 90) return 'text-yellow-400';
-    return 'text-red-400';
-  };
+  const handleCreate = async (formData) => {
+    try {
+      await productionAPI.batches?.create(formData)
+      setShowCreate(false)
+      fetchData()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to create batch')
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-eqms-dark p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-eqms-text mb-2">Production & Batch Records</h1>
-            <p className="text-eqms-text-secondary">Monitor batch production and yield metrics</p>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Production & QA</h1>
+        <p className="text-slate-400">Batch records, inspections, stability studies, and returns</p>
+      </div>
+
+      {/* Dashboard KPIs */}
+      {dashboard && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Package size={16} className="text-blue-400" />
+              <span className="text-xs text-slate-500">Active Batches</span>
+            </div>
+            <p className="text-2xl font-bold">{dashboard.active_batches ?? '—'}</p>
           </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
-            <Plus size={20} />
-            Create Batch Record
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity size={16} className="text-green-400" />
+              <span className="text-xs text-slate-500">Production Yield</span>
+            </div>
+            <p className="text-2xl font-bold">{dashboard.production_yield ? `${dashboard.production_yield}%` : '—'}</p>
+          </div>
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle size={16} className="text-purple-400" />
+              <span className="text-xs text-slate-500">Pending Inspections</span>
+            </div>
+            <p className="text-2xl font-bold">{dashboard.pending_inspections ?? '—'}</p>
+          </div>
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock size={16} className="text-yellow-400" />
+              <span className="text-xs text-slate-500">Stability Studies</span>
+            </div>
+            <p className="text-2xl font-bold">{dashboard.active_stability_studies ?? '—'}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="card p-6 mb-6">
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <div className="flex-1 relative min-w-[250px]">
+            <Search className="absolute left-3 top-2.5 text-slate-500" size={20} />
+            <input
+              type="text"
+              placeholder="Search batch records..."
+              className="input-field pl-10"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
+          </div>
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> New Batch
           </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <div key={index} className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-eqms-text-secondary text-sm mb-2">{stat.label}</p>
-                    <p className="text-3xl font-bold text-eqms-text">{stat.value}</p>
-                  </div>
-                  <Icon className={`${stat.color}`} size={24} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Batch Records Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {batches.map((batch) => (
-            <div key={batch.id} className="bg-eqms-card border border-eqms-border rounded-lg p-6 hover:border-eqms-accent transition-colors">
-              {/* Header */}
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-eqms-text">{batch.productName}</h3>
-                  <p className="text-sm text-eqms-text-secondary">Lot: {batch.lotNumber}</p>
-                </div>
-                <StatusBadge status={batch.status} />
-              </div>
-
-              {/* Yield Section */}
-              <div className="mb-4 p-3 bg-eqms-dark rounded-lg border border-eqms-border/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-eqms-text-secondary text-sm">Yield</span>
-                  <span className={`text-sm font-bold ${getYieldTextColor(batch.yield)}`}>{batch.yield}%</span>
-                </div>
-                <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${getYieldColor(batch.yield)} transition-all duration-300`}
-                    style={{ width: `${batch.yield}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Details Grid */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <p className="text-eqms-text-secondary text-xs mb-1">Units Produced</p>
-                  <p className="text-lg font-semibold text-eqms-text">{batch.unitsProduced}</p>
-                </div>
-                <div>
-                  <p className="text-eqms-text-secondary text-xs mb-1">Current Step</p>
-                  <p className="text-lg font-semibold text-eqms-text">{batch.currentStep}</p>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-eqms-border pt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-eqms-text-secondary text-xs mb-1">Start Date</p>
-                    <p className="text-sm text-eqms-text">{new Date(batch.startDate).toLocaleDateString()}</p>
-                  </div>
-                  {batch.completionDate && (
-                    <div>
-                      <p className="text-eqms-text-secondary text-xs mb-1">Completed</p>
-                      <p className="text-sm text-eqms-text">{new Date(batch.completionDate).toLocaleDateString()}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+        {loading ? (
+          <LoadingSpinner />
+        ) : !batches.length ? (
+          <EmptyState icon={Package} title="No batch records" message="Create your first batch record" />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-eqms-border">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Batch ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Product</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Stage</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Batch Size</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Yield</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Start Date</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map((b) => (
+                    <tr key={b.id} className="border-b border-eqms-border hover:bg-slate-800/50 transition">
+                      <td className="py-3 px-4 font-mono text-blue-400">{b.batch_id || b.id}</td>
+                      <td className="py-3 px-4 font-medium">{b.product_name || b.title}</td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={b.stage || b.status} />
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">{b.batch_size || '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{b.yield_percentage ? `${b.yield_percentage}%` : '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{b.production_start_date || b.created_at?.slice(0,10) || '—'}</td>
+                      <td className="py-3 px-4">
+                        <button 
+                          onClick={() => setSelected(b)}
+                          className="p-2 rounded hover:bg-slate-700 transition"
+                        >
+                          <Eye size={16} className="text-slate-400" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-        </div>
-
-        {/* No Records Message */}
-        {batches.length === 0 && (
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-12 text-center">
-            <BarChart3 size={48} className="text-eqms-text-secondary mx-auto mb-4 opacity-50" />
-            <p className="text-eqms-text-secondary">No batch records found</p>
-          </div>
+            <Pagination page={page} totalCount={totalCount} onPageChange={setPage} />
+          </>
         )}
       </div>
+
+      {/* Create Modal */}
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="New Batch Record" size="lg">
+        <CreateBatchForm onSubmit={handleCreate} onCancel={() => setShowCreate(false)} />
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={selected?.product_name || 'Batch Detail'} size="lg">
+        {selected && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-xs text-slate-500">Batch ID</span>
+              <p className="font-mono text-blue-400">{selected.batch_id || selected.id}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Stage</span>
+              <p><StatusBadge status={selected.stage || selected.status} /></p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Product</span>
+              <p className="text-sm">{selected.product_name || '—'}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Batch Size</span>
+              <p className="text-sm">{selected.batch_size || '—'}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Yield</span>
+              <p className="text-sm">{selected.yield_percentage ? `${selected.yield_percentage}%` : '—'}</p>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Start Date</span>
+              <p className="text-sm">{selected.production_start_date || '—'}</p>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
-  );
+  )
+}
+
+function CreateBatchForm({ onSubmit, onCancel }) {
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: yupResolver(batchRecordSchema),
+    defaultValues: { batch_number: '', product: '', planned_quantity: '', planned_start_date: '' },
+    mode: 'onBlur',
+  })
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <FormField label="Batch Number" error={errors.batch_number?.message} required>
+        <input {...register('batch_number')} className={`input-field ${errors.batch_number ? 'border-red-500/50' : ''}`} placeholder="Enter batch number" />
+      </FormField>
+      <FormField label="Product" error={errors.product?.message} required>
+        <input {...register('product')} className={`input-field ${errors.product ? 'border-red-500/50' : ''}`} placeholder="Enter product name" />
+      </FormField>
+      <FormField label="Planned Quantity" error={errors.planned_quantity?.message} required>
+        <input type="number" {...register('planned_quantity')} className={`input-field ${errors.planned_quantity ? 'border-red-500/50' : ''}`} placeholder="Enter planned quantity" />
+      </FormField>
+      <FormField label="Planned Start Date" error={errors.planned_start_date?.message} required>
+        <input type="date" {...register('planned_start_date')} className={`input-field ${errors.planned_start_date ? 'border-red-500/50' : ''}`} />
+      </FormField>
+      <div className="flex justify-end gap-2 pt-4 border-t border-eqms-border">
+        <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
+        <button type="submit" className="btn-primary">Create Batch</button>
+      </div>
+    </form>
+  )
 }

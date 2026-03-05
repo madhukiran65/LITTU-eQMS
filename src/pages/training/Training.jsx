@@ -1,213 +1,275 @@
-import React, { useState } from 'react';
-import { trainingCourses } from '@/data/mockData';
-import StatusBadge from '@/components/common/StatusBadge';
-import { BookOpen, Award, Users, AlertCircle, Plus, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react'
+import { Plus, Search, Eye, BookOpen, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import { trainingAPI } from '../../api'
+import { trainingCourseSchema } from '../../validation/schemas'
+import StatusBadge from '../../components/common/StatusBadge'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+import EmptyState from '../../components/common/EmptyState'
+import Pagination from '../../components/common/Pagination'
+import Modal from '../../components/common/Modal'
+import FormField from '../../components/common/FormField'
 
 export default function Training() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState('all');
+  const [records, setRecords] = useState([])
+  const [dashboard, setDashboard] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [showCreate, setShowCreate] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState(null)
 
-  // Calculate statistics
-  const totalCourses = trainingCourses.length;
-  const activeCourses = trainingCourses.filter(c => c.status === 'active').length;
-  const complianceRate = 94.2;
-  const overdueAssignments = trainingCourses.reduce((acc, course) =>
-    acc + (course.assignments?.filter(a => a.dueStatus === 'overdue').length || 0), 0
-  );
+  useEffect(() => { fetchData() }, [page, search])
 
-  // Filter courses
-  const filteredCourses = trainingCourses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = selectedType === 'all' || course.type === selectedType;
-    return matchesSearch && matchesType;
-  });
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      const [recordsRes, dashRes] = await Promise.allSettled([
+        trainingAPI.list({ page, ...(search && { search }) }),
+        trainingAPI.dashboard?.(),
+      ])
+      if (recordsRes.status === 'fulfilled') {
+        setRecords(recordsRes.value.data?.results || recordsRes.value.data || [])
+        setTotalCount(recordsRes.value.data?.count || 0)
+      }
+      if (dashRes.status === 'fulfilled' && dashRes.value) {
+        setDashboard(dashRes.value.data)
+      }
+    } catch (err) {
+      console.error('Failed to load training:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const getTypeColor = (type) => {
-    const colors = {
-      classroom: 'bg-blue-900 text-blue-200 border-blue-700',
-      online: 'bg-purple-900 text-purple-200 border-purple-700',
-      practical: 'bg-green-900 text-green-200 border-green-700'
-    };
-    return colors[type] || colors.online;
-  };
+  const handleCreate = async (formData) => {
+    try {
+      await trainingAPI.create(formData)
+      setShowCreate(false)
+      fetchData()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to create training')
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-eqms-text">Training Management</h1>
-        <button className="flex items-center gap-2 bg-eqms-accent hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition">
-          <Plus size={20} />
-          Create Course
-        </button>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Training Management</h1>
+        <p className="text-slate-400">Track employee training and competency records</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-eqms-text-secondary text-sm font-medium">Total Courses</p>
-              <p className="text-3xl font-bold text-eqms-text mt-2">{totalCourses}</p>
+      {/* Dashboard KPIs */}
+      {dashboard && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <BookOpen size={16} className="text-blue-400" />
+              <span className="text-xs text-slate-500">Total Records</span>
             </div>
-            <BookOpen size={40} className="text-eqms-accent opacity-20" />
+            <p className="text-2xl font-bold">{dashboard.total_records ?? '—'}</p>
           </div>
-        </div>
-
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-eqms-text-secondary text-sm font-medium">Active</p>
-              <p className="text-3xl font-bold text-eqms-text mt-2">{activeCourses}</p>
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle size={16} className="text-green-400" />
+              <span className="text-xs text-slate-500">Completed</span>
             </div>
-            <Award size={40} className="text-green-500 opacity-20" />
+            <p className="text-2xl font-bold">{dashboard.completed ?? '—'}</p>
           </div>
-        </div>
-
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-eqms-text-secondary text-sm font-medium">Compliance Rate</p>
-              <p className="text-3xl font-bold text-eqms-text mt-2">{complianceRate}%</p>
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock size={16} className="text-yellow-400" />
+              <span className="text-xs text-slate-500">In Progress</span>
             </div>
-            <Users size={40} className="text-green-500 opacity-20" />
+            <p className="text-2xl font-bold">{dashboard.in_progress ?? '—'}</p>
           </div>
-        </div>
-
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-eqms-text-secondary text-sm font-medium">Overdue</p>
-              <p className="text-3xl font-bold text-eqms-text mt-2">{overdueAssignments}</p>
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle size={16} className="text-red-400" />
+              <span className="text-xs text-slate-500">Overdue</span>
             </div>
-            <AlertCircle size={40} className="text-red-500 opacity-20" />
+            <p className="text-2xl font-bold">{dashboard.overdue ?? '—'}</p>
           </div>
-        </div>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="flex gap-4">
-        <div className="flex-1 relative">
-          <Search size={18} className="absolute left-3 top-3 text-eqms-text-secondary" />
-          <input
-            type="text"
-            placeholder="Search courses..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-eqms-card border border-eqms-border rounded-lg pl-10 pr-4 py-2 text-eqms-text placeholder-eqms-text-secondary focus:outline-none focus:border-eqms-accent"
-          />
-        </div>
-        <select
-          value={selectedType}
-          onChange={(e) => setSelectedType(e.target.value)}
-          className="bg-eqms-card border border-eqms-border rounded-lg px-4 py-2 text-eqms-text focus:outline-none focus:border-eqms-accent"
-        >
-          <option value="all">All Types</option>
-          <option value="classroom">Classroom</option>
-          <option value="online">Online</option>
-          <option value="practical">Practical</option>
-        </select>
-      </div>
-
-      {/* Courses Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredCourses.map(course => (
-          <div key={course.id} className="bg-eqms-card border border-eqms-border rounded-lg p-6 hover:border-eqms-accent transition">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-semibold text-eqms-text flex-1">{course.title}</h3>
-              <span className={`text-xs font-semibold px-3 py-1 rounded border ${getTypeColor(course.type)}`}>
-                {course.type.charAt(0).toUpperCase() + course.type.slice(1)}
-              </span>
-            </div>
-
-            <p className="text-eqms-text-secondary text-sm mb-4">{course.description}</p>
-
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-eqms-text-secondary">Enrollment</span>
-                  <span className="text-eqms-text font-medium">{course.enrolled}/{course.capacity}</span>
-                </div>
-                <div className="w-full bg-eqms-dark rounded-full h-2">
-                  <div
-                    className="bg-eqms-accent rounded-full h-2 transition"
-                    style={{ width: `${(course.enrolled / course.capacity) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-eqms-text-secondary">Pass Rate</span>
-                  <span className="text-eqms-text font-medium">{course.passRate}%</span>
-                </div>
-                <div className="w-full bg-eqms-dark rounded-full h-2">
-                  <div
-                    className={`rounded-full h-2 transition ${
-                      course.passRate >= 80 ? 'bg-green-500' : 'bg-yellow-500'
-                    }`}
-                    style={{ width: `${course.passRate}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-between pt-2 border-t border-eqms-border">
-                <span className="text-sm text-eqms-text-secondary">Duration</span>
-                <span className="text-sm font-medium text-eqms-text">{course.duration} hours</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-sm text-eqms-text-secondary">Completed</span>
-                <span className="text-sm font-medium text-eqms-text">{course.completed}</span>
-              </div>
-            </div>
-
-            <button className="w-full mt-4 bg-eqms-accent hover:bg-blue-600 text-white py-2 rounded-lg transition text-sm font-medium">
-              View Course
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {filteredCourses.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-eqms-text-secondary">No courses found matching your criteria</p>
         </div>
       )}
 
-      {/* Quiz Section */}
-      <div className="mt-8">
-        <h2 className="text-2xl font-bold text-eqms-text mb-4">Assessment Preview</h2>
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 bg-eqms-accent rounded-lg flex items-center justify-center">
-              <Award size={24} className="text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-eqms-text">ISO 9001:2015 Fundamentals Quiz</h3>
-              <p className="text-sm text-eqms-text-secondary">Part of: Quality Management Essentials</p>
-            </div>
+      <div className="card p-6 mb-6">
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <div className="flex-1 relative min-w-[250px]">
+            <Search className="absolute left-3 top-2.5 text-slate-500" size={20} />
+            <input
+              type="text"
+              placeholder="Search training records..."
+              className="input-field pl-10"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
           </div>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-eqms-text">20</p>
-              <p className="text-sm text-eqms-text-secondary">Questions</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-eqms-text">30</p>
-              <p className="text-sm text-eqms-text-secondary">Minutes</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-eqms-text">75%</p>
-              <p className="text-sm text-eqms-text-secondary">Pass Score</p>
-            </div>
-          </div>
-          <button className="w-full mt-4 border border-eqms-accent hover:bg-eqms-accent/10 text-eqms-accent py-2 rounded-lg transition font-medium">
-            Start Quiz
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> New Training
           </button>
         </div>
+
+        {loading ? (
+          <LoadingSpinner />
+        ) : !records.length ? (
+          <EmptyState icon={BookOpen} title="No training records" message="Create your first training record" />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-eqms-border">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Training ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Title</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Type</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Trainee</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Due Date</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.map((r) => (
+                    <tr key={r.id} className="border-b border-eqms-border hover:bg-slate-800/50 transition">
+                      <td className="py-3 px-4 font-mono text-blue-400">{r.training_id || r.id}</td>
+                      <td className="py-3 px-4 font-medium">{r.title}</td>
+                      <td className="py-3 px-4 text-slate-400">{r.training_type || '—'}</td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">{r.trainee_name || r.assignee_name || '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{r.due_date || '—'}</td>
+                      <td className="py-3 px-4">
+                        <button 
+                          onClick={() => setSelectedRecord(r)}
+                          className="p-2 rounded hover:bg-slate-700 transition"
+                        >
+                          <Eye size={16} className="text-slate-400" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalCount={totalCount} onPageChange={setPage} />
+          </>
+        )}
       </div>
+
+      {/* Create Modal */}
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Create Training Record" size="lg">
+        <CreateTrainingForm onSubmit={handleCreate} onCancel={() => setShowCreate(false)} />
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal isOpen={!!selectedRecord} onClose={() => setSelectedRecord(null)} title={selectedRecord?.title || 'Training Detail'} size="lg">
+        {selectedRecord && <TrainingDetail training={selectedRecord} onClose={() => setSelectedRecord(null)} onRefresh={fetchData} />}
+      </Modal>
     </div>
-  );
+  )
 }
+
+function CreateTrainingForm({ onSubmit, onCancel }) {
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: yupResolver(trainingCourseSchema),
+    defaultValues: { title: '', description: '', training_type: 'classroom', duration_hours: '' },
+    mode: 'onBlur',
+  })
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <FormField label="Title" error={errors.title?.message} required>
+        <input {...register('title')} className={`input-field ${errors.title ? 'border-red-500/50' : ''}`} placeholder="Enter training title" />
+      </FormField>
+      <FormField label="Description" error={errors.description?.message} required>
+        <textarea {...register('description')} className={`input-field h-32 ${errors.description ? 'border-red-500/50' : ''}`} placeholder="Describe the training course" />
+      </FormField>
+      <FormField label="Training Type" error={errors.training_type?.message} required>
+        <select {...register('training_type')} className="input-field">
+          <option value="">Select type</option>
+          <option value="classroom">Classroom</option>
+          <option value="online">Online</option>
+          <option value="on_the_job">On-the-Job</option>
+          <option value="scorm">SCORM</option>
+          <option value="quiz">Quiz</option>
+        </select>
+      </FormField>
+      <FormField label="Duration (Hours)" error={errors.duration_hours?.message} required>
+        <input type="number" {...register('duration_hours')} className={`input-field ${errors.duration_hours ? 'border-red-500/50' : ''}`} placeholder="Enter duration in hours" step="0.5" />
+      </FormField>
+      <div className="flex justify-end gap-2 pt-4 border-t border-eqms-border">
+        <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
+        <button type="submit" className="btn-primary">Create Training</button>
+      </div>
+    </form>
+  )
+}
+
+function TrainingDetail({ training, onClose, onRefresh }) {
+  const [auditTrail, setAuditTrail] = useState([])
+  const [tab, setTab] = useState('details')
+
+  useEffect(() => {
+    if (training.id && trainingAPI.auditTrail) {
+      trainingAPI.auditTrail(training.id).then(r => setAuditTrail(r.data || [])).catch(() => {})
+    }
+  }, [training.id])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 border-b border-eqms-border pb-2">
+        {['details', 'audit_trail'].map(t => (
+          <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm rounded ${tab === t ? 'bg-blue-500/10 text-blue-400 font-medium' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t === 'details' ? 'Details' : 'Audit Trail'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'details' && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <span className="text-xs text-slate-500">Training ID</span>
+            <p className="font-mono text-blue-400">{training.training_id || training.id}</p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Status</span>
+            <p><StatusBadge status={training.status} /></p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Type</span>
+            <p className="text-sm">{training.training_type || '—'}</p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Due Date</span>
+            <p className="text-sm">{training.due_date || '—'}</p>
+          </div>
+          {training.description && (
+            <div className="col-span-2">
+              <span className="text-xs text-slate-500">Description</span>
+              <p className="text-sm text-slate-300 mt-1">{training.description}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'audit_trail' && (
+        <div className="space-y-2">
+          {auditTrail.length ? auditTrail.map((entry, i) => (
+            <div key={i} className="p-3 bg-slate-800 rounded text-sm border border-slate-700">
+              <div className="flex justify-between mb-1">
+                <span className="font-medium">{entry.action}</span>
+                <span className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleString()}</span>
+              </div>
+              <p className="text-slate-400 text-xs">{entry.user} — {entry.details}</p>
+            </div>
+          )) : <p className="text-sm text-slate-500">No audit trail entries</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+

@@ -1,209 +1,269 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Plus, AlertCircle } from 'lucide-react';
-import { deviations } from '@/data/mockData';
-import StatusBadge from '@/components/common/StatusBadge';
+import React, { useState, useEffect } from 'react'
+import { Plus, Search, Eye, AlertTriangle } from 'lucide-react'
+import { useForm, Controller } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
+import { deviationsAPI } from '../../api'
+import { deviationCreateSchema } from '../../validation/schemas'
+import StatusBadge from '../../components/common/StatusBadge'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+import EmptyState from '../../components/common/EmptyState'
+import Pagination from '../../components/common/Pagination'
+import Modal from '../../components/common/Modal'
+import FormField from '../../components/common/FormField'
+import RichTextEditor from '../../components/common/RichTextEditor'
+import RichTextViewer from '../../components/common/RichTextViewer'
 
-const Deviations = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [stageFilter, setStageFilter] = useState('all');
-  const [severityFilter, setSeverityFilter] = useState('all');
+export default function Deviations() {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
 
-  const stages = ['draft', 'investigation', 'review', 'implementation', 'closed'];
-  const severities = ['Critical', 'High', 'Medium', 'Low'];
+  useEffect(() => { fetchItems() }, [page, search, statusFilter])
 
-  const filteredDeviations = useMemo(() => {
-    return deviations.filter((dev) => {
-      const matchesSearch =
-        String(dev.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dev.title.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStage = stageFilter === 'all' || dev.stage === stageFilter;
-      const matchesSeverity = severityFilter === 'all' || dev.severity === severityFilter;
-      return matchesSearch && matchesStage && matchesSeverity;
-    });
-  }, [searchTerm, stageFilter, severityFilter]);
+  const fetchItems = async () => {
+    setLoading(true)
+    try {
+      const params = { page, ...(search && { search }), ...(statusFilter && { status: statusFilter }) }
+      const { data } = await deviationsAPI.list(params)
+      setItems(data.results || data || [])
+      setTotalCount(data.count || 0)
+    } catch (err) {
+      console.error('Failed to load deviations:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const stats = {
-    open: deviations.filter((d) => d.stage !== 'closed').length,
-    underInvestigation: deviations.filter((d) => d.stage === 'investigation').length,
-    critical: deviations.filter((d) => d.severity === 'Critical').length,
-    closedThisMonth: deviations.filter((d) => {
-      if (d.stage !== 'closed') return false;
-      const closedDate = new Date(d.closedDate);
-      const now = new Date();
-      return (
-        closedDate.getMonth() === now.getMonth() &&
-        closedDate.getFullYear() === now.getFullYear()
-      );
-    }).length,
-  };
-
-  const isCritical = (severity) => severity === 'Critical';
+  const handleCreate = async (formData) => {
+    setCreating(true)
+    try {
+      await deviationsAPI.create(formData)
+      setShowCreate(false)
+      fetchItems()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to create deviation')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-eqms-dark p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-eqms-text mb-2">Deviations</h1>
-          <p className="text-eqms-text-secondary">Track and manage process deviations</p>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Deviations</h1>
+        <p className="text-slate-400">Track and manage deviations from normal operations</p>
+      </div>
+
+      <div className="card p-6 mb-6">
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <div className="flex-1 relative min-w-[250px]">
+            <Search className="absolute left-3 top-2.5 text-slate-500" size={20} />
+            <input
+              type="text"
+              placeholder="Search deviations..."
+              className="input-field pl-10"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
+          </div>
+          <select 
+            value={statusFilter} 
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} 
+            className="input-field w-auto"
+          >
+            <option value="">All Statuses</option>
+            <option value="reported">Reported</option>
+            <option value="assessment">Assessment</option>
+            <option value="investigation">Investigation</option>
+            <option value="root_cause">Root Cause</option>
+            <option value="response_plan">Response Plan</option>
+            <option value="implementation">Implementation</option>
+            <option value="effectiveness">Effectiveness</option>
+            <option value="closure">Closure</option>
+            <option value="closed">Closed</option>
+          </select>
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={18} /> New Deviation
+          </button>
         </div>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2">Open</p>
-            <p className="text-3xl font-bold text-eqms-text">{stats.open}</p>
-          </div>
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2">Under Investigation</p>
-            <p className="text-3xl font-bold text-eqms-text">{stats.underInvestigation}</p>
-          </div>
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2 flex items-center gap-2">
-              <AlertCircle size={16} className="text-red-500" />
-              Critical
-            </p>
-            <p className="text-3xl font-bold text-red-500">{stats.critical}</p>
-          </div>
-          <div className="bg-eqms-card border border-eqms-border rounded-lg p-6">
-            <p className="text-eqms-text-secondary text-sm mb-2">Closed This Month</p>
-            <p className="text-3xl font-bold text-eqms-text">{stats.closedThisMonth}</p>
-          </div>
-        </div>
-
-        {/* Filter Bar */}
-        <div className="bg-eqms-card border border-eqms-border rounded-lg p-4 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search
-                size={18}
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-eqms-text-secondary"
-              />
-              <input
-                type="text"
-                placeholder="Search deviation ID or title..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-eqms-dark border border-eqms-border rounded text-eqms-text placeholder-eqms-text-secondary focus:outline-none focus:border-eqms-accent"
-              />
-            </div>
-            <select
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-              className="px-4 py-2 bg-eqms-dark border border-eqms-border rounded text-eqms-text focus:outline-none focus:border-eqms-accent"
-            >
-              <option value="all">All Stages</option>
-              {stages.map((stage) => (
-                <option key={stage} value={stage}>
-                  {stage.charAt(0).toUpperCase() + stage.slice(1)}
-                </option>
-              ))}
-            </select>
-            <select
-              value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value)}
-              className="px-4 py-2 bg-eqms-dark border border-eqms-border rounded text-eqms-text focus:outline-none focus:border-eqms-accent"
-            >
-              <option value="all">All Severities</option>
-              {severities.map((severity) => (
-                <option key={severity} value={severity}>
-                  {severity}
-                </option>
-              ))}
-            </select>
-            <button className="px-4 py-2 bg-eqms-accent text-eqms-dark font-semibold rounded hover:bg-opacity-90 transition flex items-center justify-center gap-2">
-              <Plus size={18} />
-              Report Deviation
-            </button>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-eqms-card border border-eqms-border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-eqms-border bg-eqms-dark/50">
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Deviation ID
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Title
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Stage
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Severity
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Department
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Assignee
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-eqms-text">
-                    Due Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDeviations.map((dev) => (
-                  <tr
-                    key={dev.id}
-                    className={`border-b border-eqms-border hover:bg-eqms-dark/50 transition ${
-                      isCritical(dev.severity) ? 'border-l-4 border-l-red-500' : ''
-                    }`}
-                  >
-                    <td className="px-6 py-4 text-sm font-medium text-eqms-accent">
-                      {dev.id}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-eqms-text">{dev.title}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <StatusBadge
-                        status={dev.stage}
-                        label={dev.stage.charAt(0).toUpperCase() + dev.stage.slice(1)}
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        {isCritical(dev.severity) && (
-                          <div className="w-2 h-2 rounded-full bg-red-500" />
-                        )}
-                        <StatusBadge
-                          status={dev.severity.toLowerCase()}
-                          label={dev.severity}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-eqms-text-secondary">
-                      {dev.department}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-eqms-text">{dev.assignee}</td>
-                    <td className="px-6 py-4 text-sm text-eqms-text-secondary">
-                      {new Date(dev.dueDate).toLocaleDateString()}
-                    </td>
+        {loading ? (
+          <LoadingSpinner />
+        ) : !items.length ? (
+          <EmptyState icon={AlertTriangle} title="No deviations found" message="Create your first deviation record" />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-eqms-border">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Deviation ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Title</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Stage</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Severity</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Reported By</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Date</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-300">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-b border-eqms-border hover:bg-slate-800/50 transition">
+                      <td className="py-3 px-4 font-mono text-blue-400">{item.deviation_id || item.id}</td>
+                      <td className="py-3 px-4 font-medium">{item.title}</td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={item.status || item.stage} />
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">{item.severity || '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{item.reported_by_name || '—'}</td>
+                      <td className="py-3 px-4 text-slate-400">{item.reported_date || item.created_at?.slice(0,10) || '—'}</td>
+                      <td className="py-3 px-4">
+                        <button 
+                          onClick={() => setSelectedItem(item)}
+                          className="p-2 rounded hover:bg-slate-700 transition"
+                        >
+                          <Eye size={16} className="text-slate-400" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalCount={totalCount} onPageChange={setPage} />
+          </>
+        )}
+      </div>
+
+      {/* Create Modal */}
+      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Create New Deviation" size="lg">
+        <CreateDeviationForm onSubmit={handleCreate} loading={creating} onCancel={() => setShowCreate(false)} />
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal isOpen={!!selectedItem} onClose={() => setSelectedItem(null)} title={selectedItem?.title || 'Deviation Detail'} size="lg">
+        {selectedItem && <DeviationDetail deviation={selectedItem} onClose={() => setSelectedItem(null)} onRefresh={fetchItems} />}
+      </Modal>
+    </div>
+  )
+}
+
+function CreateDeviationForm({ onSubmit, loading, onCancel }) {
+  const { register, handleSubmit, control, formState: { errors } } = useForm({
+    resolver: yupResolver(deviationCreateSchema),
+    defaultValues: { title: '', description: '', deviation_type: 'minor', department: '', discovery_date: '' },
+    mode: 'onBlur',
+  })
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      <FormField label="Title" error={errors.title?.message} required>
+        <input {...register('title')} className={`input-field ${errors.title ? 'border-red-500/50' : ''}`} placeholder="Enter deviation title" />
+      </FormField>
+      <FormField label="Description" error={errors.description?.message} required helpText="Minimum 20 characters — use rich text for detailed descriptions">
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <RichTextEditor
+              value={field.value}
+              onChange={field.onChange}
+              placeholder="Describe the deviation details..."
+              minHeight="180px"
+              error={!!errors.description}
+            />
+          )}
+        />
+      </FormField>
+      <FormField label="Deviation Type" error={errors.deviation_type?.message} required>
+        <select {...register('deviation_type')} className="input-field">
+          <option value="">Select type</option>
+          <option value="minor">Minor</option>
+          <option value="major">Major</option>
+          <option value="critical">Critical</option>
+        </select>
+      </FormField>
+      <FormField label="Department" error={errors.department?.message} required>
+        <input {...register('department')} className={`input-field ${errors.department ? 'border-red-500/50' : ''}`} placeholder="Enter department" />
+      </FormField>
+      <FormField label="Discovery Date" error={errors.discovery_date?.message} required>
+        <input type="date" {...register('discovery_date')} className={`input-field ${errors.discovery_date ? 'border-red-500/50' : ''}`} />
+      </FormField>
+      <div className="flex justify-end gap-2 pt-4 border-t border-eqms-border">
+        <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
+        <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Creating...' : 'Create Deviation'}</button>
+      </div>
+    </form>
+  )
+}
+
+function DeviationDetail({ deviation, onClose, onRefresh }) {
+  const [auditTrail, setAuditTrail] = useState([])
+  const [tab, setTab] = useState('details')
+
+  useEffect(() => {
+    if (deviation.id && deviationsAPI.auditTrail) {
+      deviationsAPI.auditTrail(deviation.id).then(r => setAuditTrail(r.data || [])).catch(() => {})
+    }
+  }, [deviation.id])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 border-b border-eqms-border pb-2">
+        {['details', 'audit_trail'].map(t => (
+          <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm rounded ${tab === t ? 'bg-blue-500/10 text-blue-400 font-medium' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t === 'details' ? 'Details' : 'Audit Trail'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'details' && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <span className="text-xs text-slate-500">Deviation ID</span>
+            <p className="font-mono text-blue-400">{deviation.deviation_id || deviation.id}</p>
           </div>
-          {filteredDeviations.length === 0 && (
-            <div className="px-6 py-12 text-center">
-              <p className="text-eqms-text-secondary">
-                No deviations found matching your criteria
-              </p>
+          <div>
+            <span className="text-xs text-slate-500">Stage</span>
+            <p><StatusBadge status={deviation.status || deviation.stage} /></p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Severity</span>
+            <p className="text-sm">{deviation.severity || '—'}</p>
+          </div>
+          <div>
+            <span className="text-xs text-slate-500">Reported Date</span>
+            <p className="text-sm">{deviation.reported_date || '—'}</p>
+          </div>
+          {deviation.description && (
+            <div className="col-span-2">
+              <span className="text-xs text-slate-500">Description</span>
+              <RichTextViewer content={deviation.description} className="mt-1" />
             </div>
           )}
         </div>
+      )}
 
-        {/* Results Count */}
-        <div className="mt-4 text-sm text-eqms-text-secondary">
-          Showing {filteredDeviations.length} of {deviations.length} deviations
+      {tab === 'audit_trail' && (
+        <div className="space-y-2">
+          {auditTrail.length ? auditTrail.map((entry, i) => (
+            <div key={i} className="p-3 bg-slate-800 rounded text-sm border border-slate-700">
+              <div className="flex justify-between mb-1">
+                <span className="font-medium">{entry.action}</span>
+                <span className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleString()}</span>
+              </div>
+              <p className="text-slate-400 text-xs">{entry.user} — {entry.details}</p>
+            </div>
+          )) : <p className="text-sm text-slate-500">No audit trail entries</p>}
         </div>
-      </div>
+      )}
     </div>
-  );
-};
+  )
+}
 
-export default Deviations;

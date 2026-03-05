@@ -1,241 +1,78 @@
-import { useState } from 'react';
-import { Search, Plus, Filter, ChevronDown } from 'lucide-react';
-import { documents } from '@/data/mockData';
-import StatusBadge from '@/components/common/StatusBadge';
+import React, { useState } from 'react'
+import { Plus, Search, Filter, Download } from 'lucide-react'
 
 export default function Documents() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
 
-  const documentTypes = ['SOP', 'Work Instruction', 'Form', 'Record', 'Policy', 'Procedure'];
-  const statusOptions = [
-    'draft',
-    'in_review',
-    'approved',
-    'effective',
-    'training_period',
-    'superseded',
-    'obsolete',
-    'archived',
-    'cancelled',
-  ];
-
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch =
-      doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (doc.docId || doc.document_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.department.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = !statusFilter || doc.status === statusFilter;
-    const matchesType = !typeFilter || doc.type === typeFilter;
-    return matchesSearch && matchesStatus && matchesType;
-  });
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const documents = [
+    { id: 1, name: 'SOP-QA-001', title: 'Quality Assurance Procedures', status: 'Approved', version: 'Rev 2', date: '2025-02-15' },
+    { id: 2, name: 'SOP-MFG-002', title: 'Manufacturing Process', status: 'In Review', version: 'Rev 1', date: '2025-02-20' },
+    { id: 3, name: 'WI-TEST-001', title: 'Testing Instructions', status: 'Approved', version: 'Rev 5', date: '2025-01-10' },
+  ]
 
   return (
-    <div className="min-h-screen bg-eqms-dark p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-eqms-text mb-2">Documents</h1>
-            <p className="text-eqms-text-secondary">Manage your controlled documents and records</p>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Document Control</h1>
+        <p className="text-slate-400">Manage controlled documents and correspondence</p>
+      </div>
+
+      <div className="card p-6">
+        <div className="flex gap-4 mb-6">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-2.5 text-slate-500" size={20} />
+            <input
+              type="text"
+              placeholder="Search documents..."
+              className="input-field pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <button className="bg-eqms-accent hover:bg-eqms-accent/90 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
-            <Plus className="w-5 h-5" />
+          <button className="btn-secondary flex items-center gap-2">
+            <Filter size={18} />
+            Filter
+          </button>
+          <button className="btn-primary flex items-center gap-2">
+            <Plus size={18} />
             New Document
           </button>
         </div>
 
-        {/* Search and Filters */}
-        <div className="bg-eqms-card rounded-lg p-4 border border-eqms-border mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search Bar */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-eqms-text-secondary w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search by title, ID, or department..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-eqms-dark border border-eqms-border rounded-lg text-eqms-text placeholder-eqms-text-secondary focus:outline-none focus:border-eqms-accent"
-              />
-            </div>
-
-            {/* Status Filter */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowStatusDropdown(!showStatusDropdown);
-                  setShowTypeDropdown(false);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-eqms-dark border border-eqms-border rounded-lg text-eqms-text hover:border-eqms-accent transition-colors"
-              >
-                <Filter className="w-4 h-4" />
-                <span className="text-sm">Status</span>
-                <ChevronDown className="w-4 h-4" />
-              </button>
-              {showStatusDropdown && (
-                <div className="absolute top-full mt-2 right-0 bg-eqms-card border border-eqms-border rounded-lg shadow-lg z-10 min-w-48">
-                  <div className="p-2">
-                    <button
-                      onClick={() => {
-                        setStatusFilter('');
-                        setShowStatusDropdown(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                        !statusFilter ? 'bg-eqms-accent text-white' : 'text-eqms-text hover:bg-eqms-dark'
-                      }`}
-                    >
-                      All Statuses
-                    </button>
-                    {statusOptions.map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => {
-                          setStatusFilter(status);
-                          setShowStatusDropdown(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors capitalize ${
-                          statusFilter === status
-                            ? 'bg-eqms-accent text-white'
-                            : 'text-eqms-text hover:bg-eqms-dark'
-                        }`}
-                      >
-                        {status.replace('_', ' ')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Type Filter */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowTypeDropdown(!showTypeDropdown);
-                  setShowStatusDropdown(false);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-eqms-dark border border-eqms-border rounded-lg text-eqms-text hover:border-eqms-accent transition-colors"
-              >
-                <Filter className="w-4 h-4" />
-                <span className="text-sm">Type</span>
-                <ChevronDown className="w-4 h-4" />
-              </button>
-              {showTypeDropdown && (
-                <div className="absolute top-full mt-2 right-0 bg-eqms-card border border-eqms-border rounded-lg shadow-lg z-10 min-w-48">
-                  <div className="p-2">
-                    <button
-                      onClick={() => {
-                        setTypeFilter('');
-                        setShowTypeDropdown(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                        !typeFilter ? 'bg-eqms-accent text-white' : 'text-eqms-text hover:bg-eqms-dark'
-                      }`}
-                    >
-                      All Types
-                    </button>
-                    {documentTypes.map((type) => (
-                      <button
-                        key={type}
-                        onClick={() => {
-                          setTypeFilter(type);
-                          setShowTypeDropdown(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                          typeFilter === type
-                            ? 'bg-eqms-accent text-white'
-                            : 'text-eqms-text hover:bg-eqms-dark'
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Results Count */}
-        <div className="mb-4 text-eqms-text-secondary text-sm">
-          Showing {filteredDocuments.length} of {documents.length} documents
-        </div>
-
-        {/* Table */}
-        <div className="bg-eqms-card rounded-lg border border-eqms-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-eqms-dark border-b border-eqms-border">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-eqms-text-secondary uppercase tracking-wider">
-                    Doc ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-eqms-text-secondary uppercase tracking-wider">
-                    Title
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-eqms-text-secondary uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-eqms-text-secondary uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-eqms-text-secondary uppercase tracking-wider">
-                    Version
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-eqms-text-secondary uppercase tracking-wider">
-                    Department
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-eqms-text-secondary uppercase tracking-wider">
-                    Author
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-eqms-text-secondary uppercase tracking-wider">
-                    Updated
-                  </th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-eqms-border">
+                <th className="text-left py-3 px-4 font-semibold text-slate-300">Document ID</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-300">Title</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-300">Status</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-300">Version</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-300">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {documents.map((doc) => (
+                <tr key={doc.id} className="border-b border-eqms-border hover:bg-eqms-input transition-colors cursor-pointer">
+                  <td className="py-3 px-4 font-mono text-blue-400">{doc.name}</td>
+                  <td className="py-3 px-4">{doc.title}</td>
+                  <td className="py-3 px-4">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      doc.status === 'Approved'
+                        ? 'bg-green-500/10 text-green-400'
+                        : 'bg-yellow-500/10 text-yellow-400'
+                    }`}>
+                      {doc.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-slate-400">{doc.version}</td>
+                  <td className="py-3 px-4 text-slate-500">{doc.date}</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-eqms-border">
-                {filteredDocuments.length > 0 ? (
-                  filteredDocuments.map((doc) => (
-                    <tr key={doc.id} className="hover:bg-eqms-dark/50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-eqms-accent">{doc.docId || doc.document_id}</td>
-                      <td className="px-6 py-4 text-sm text-eqms-text">{doc.title}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-eqms-text">{doc.type}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <StatusBadge status={doc.status} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-eqms-text">{doc.version}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-eqms-text">{doc.department}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-eqms-text">{doc.author}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-eqms-text-secondary">
-                        {formatDate(doc.lastUpdated || doc.updated)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="8" className="px-6 py-8 text-center text-eqms-text-secondary">
-                      No documents found matching your criteria
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
-  );
+  )
 }
